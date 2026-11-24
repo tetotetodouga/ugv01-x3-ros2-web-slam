@@ -1,6 +1,7 @@
 """Software regression checks. Run with ROS_DOMAIN_ID=91 ROS_LOCALHOST_ONLY=1."""
 from concurrent.futures import Future
 import math
+import os
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -17,6 +18,8 @@ from ugv01_room_explore.stack_supervisor import StackSupervisor, map_name
 
 @pytest.fixture(scope='module', autouse=True)
 def ros():
+    if os.environ.get('ROS_DOMAIN_ID') != '91' or os.environ.get('ROS_LOCALHOST_ONLY') != '1':
+        pytest.skip('Run with ROS_DOMAIN_ID=91 ROS_LOCALHOST_ONLY=1; hardware domain is excluded')
     rclpy.init(args=[])
     yield
     rclpy.shutdown()

@@ -84,6 +84,7 @@ source ~/ros2_ws/install/setup.bash
 cd ~/ros2_ws/src/ugv01-room-explore
 ROS_DOMAIN_ID=91 ROS_LOCALHOST_ONLY=1 python3 -m pytest test/test_navigation.py -q
 ROS_DOMAIN_ID=91 ROS_LOCALHOST_ONLY=1 python3 test/smoke_nav2.py
+ROS_DOMAIN_ID=92 ROS_LOCALHOST_ONLY=1 python3 test/smoke_http.py
 ```
 
 Smoke запускает только программные узлы Nav2 с искусственной картой, TF, одометрией и сканами. Он проверяет плагины, lifecycle, планирование и приём/отмену цели в домене 91. Это не испытание физической навигации.
