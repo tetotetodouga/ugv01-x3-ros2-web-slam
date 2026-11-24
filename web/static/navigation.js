@@ -1,4 +1,4 @@
-/* Map coordinates, touch selection and Nav2 HTTP controls. No third-party assets. */
+/* Map coordinates, touch selection and Nav2 HTTP controls. */
 let rasterSource = null;
 let rasterCanvas = null;
 let lastStackMode = null;
@@ -20,11 +20,13 @@ async function apiPost(path, body = {}) {
   } catch (e) {
     log(e.message);
     $('navStatus').textContent = e.message;
+    notifyUser(e.message, true);
     return { ok: false, error: e.message };
   }
 }
 
 async function emergencyStop() {
+  closeDialogs();
   stopRobot();
   // Immediate ROS STOP as well as HTTP action cancellation, even during mode switching.
   send({ op: 'publish', topic: '/ugv01/stop', msg: {} });
@@ -50,6 +52,7 @@ async function refreshServerStatus() {
     if (mode !== data.mode) stopRobot();
     mode = data.mode || 'JOY';
     renderDriveMode();
+    updateDashboard(data);
     if (Date.now() - driveCmdAt > 1500) $('cmdStat').textContent = '— / —';
     const sourceChanged = lastStackMode !== navigation.stack_mode;
     if (sourceChanged) {
@@ -73,9 +76,10 @@ async function refreshServerStatus() {
       robotPose = null;
       $('poseStat').textContent = 'TF: ожидание';
     }
-    const stateNames = { idle: 'ожидание цели', pending: 'отправка', navigating: 'движение',
-      succeeded: 'цель достигнута', canceled: 'отменено', failed: 'ошибка', rejected: 'цель отклонена' };
-    let message = navigation.ready ? `Nav2 готов · ${stateNames[navigation.goal_state] || navigation.goal_state}` : navigation.reason;
+    const stateNames = { idle: 'Готов к поездке', pending: 'Отправляем цель', navigating: 'Едет к цели',
+      succeeded: 'Цель достигнута', canceled: 'Робот остановлен', failed: 'Не удалось доехать', rejected: 'Цель недоступна' };
+    let message = navigation.ready ? (stateNames[navigation.goal_state] || 'Готов к поездке') :
+      navigation.stack_mode === 'mapping' ? 'Строим карту · управление вручную' : navigation.reason;
     if (navigation.distance_remaining != null) message += ` · ${navigation.distance_remaining.toFixed(2)} м`;
     if (navigation.error || data.error) message += ` · ${navigation.error || data.error}`;
     $('navStatus').textContent = message || 'SLAM';
@@ -83,7 +87,7 @@ async function refreshServerStatus() {
     $('toolGoal').disabled = !navigation.ready;
     $('toolPose').disabled = navigation.stack_mode !== 'nav_map' || !navigation.lifecycle?.amcl;
     $('globalPose').disabled = $('toolPose').disabled;
-    if (!data.managed) $('navStatus').textContent += ' · Для Nav2 запустите web_navigation.launch.py';
+    if (!data.managed) $('navStatus').textContent = 'Построение карты';
     updateSelectionStatus();
     drawMap();
   } catch (e) {
@@ -93,6 +97,8 @@ async function refreshServerStatus() {
     $('navStatus').textContent = e.message;
     $('navStatus').classList.remove('ready');
     $('sendSelection').disabled = true;
+    $('toolGoal').disabled = true;
+    $('navDot').className = 'dot bad';
   }
 }
 
@@ -106,7 +112,9 @@ async function reloadMaps() {
     if (!data.maps.length) $('savedMap').add(new Option('Нет сохранённых карт', ''));
     data.maps.forEach(name => $('savedMap').add(new Option(name, name)));
     if (data.maps.includes(selected)) $('savedMap').value = selected;
-  } catch (e) { log(e.message); }
+    savedCards = data.items || data.maps.map(name => ({ name }));
+    renderGallery();
+  } catch (e) { log(e.message); $('mapsMessage').textContent = e.message; $('mapsMessage').classList.add('error'); }
 }
 
 function setMapTool(tool) {
@@ -116,15 +124,37 @@ function setMapTool(tool) {
   mapView.dragging = false;
   ['pan', 'goal', 'pose'].forEach(name => $('tool' + name[0].toUpperCase() + name.slice(1)).classList.toggle('active', tool === name));
   canvas.style.cursor = tool === 'pan' ? 'grab' : 'crosshair';
+  $('mapHint').hidden = tool === 'pan';
+  $('mapHintText').textContent = tool === 'pose' ? 'Укажите положение робота и потяните в сторону его взгляда' : 'Нажмите на карту и потяните, чтобы задать направление';
   updateSelectionStatus();
   drawMap();
 }
 
 function updateSelectionStatus() {
-  $('selectionStatus').textContent = selection ?
-    `${selection.tool === 'goal' ? 'Цель' : 'Поза'}: x=${selection.x.toFixed(2)} м, y=${selection.y.toFixed(2)} м, угол=${(selection.yaw * 180 / Math.PI).toFixed(0)}°` : 'Точка не выбрана';
-  $('sendSelection').disabled = requestBusy || !serverOnline || !selection ||
-    (selection.tool === 'goal' ? !navigation.ready : navigation.stack_mode !== 'nav_map');
+  const navigating = ['pending', 'navigating'].includes(navigation.goal_state);
+  const distance = selection && robotPose ? Math.hypot(selection.x - robotPose.x, selection.y - robotPose.y) : navigation.distance_remaining;
+  $('selectionStatus').textContent = selection ? (selection.tool === 'pose' ? 'Положение выбрано' : 'Цель выбрана') :
+    navigating ? 'Робот едет к цели' : navigation.goal_state === 'succeeded' ? 'Цель достигнута' : mapTool === 'goal' ? 'Выберите точку на карте' : 'Куда поедем?';
+  $('goalDetail').textContent = distance != null && (selection || navigating) ? `${distance.toFixed(1).replace('.', ',')} м${navigating ? ' до цели' : ' от робота'}` :
+    selection ? 'Проверьте точку и подтвердите' : mapTool === 'goal' ? 'Потяните, чтобы задать направление' : 'Нажмите «Цель» или откройте управление';
+  $('goLabel').textContent = selection?.tool === 'pose' ? 'Установить' : 'Поехать';
+  const enableNavigation = !selection && navigation.stack_mode === 'mapping';
+  const locateRobot = !selection && navigation.stack_mode === 'nav_map' && !navigation.ready &&
+    navigation.lifecycle?.amcl && navigation.localization_covariance == null;
+  if (enableNavigation) {
+    $('selectionStatus').textContent = 'Построение карты';
+    $('goalDetail').textContent = 'Включите навигацию, чтобы ехать к точке';
+    $('goLabel').textContent = 'Включить навигацию';
+  } else if (locateRobot) {
+    $('selectionStatus').textContent = 'Где находится робот?';
+    $('goalDetail').textContent = 'Укажите положение на готовой карте';
+    $('goLabel').textContent = 'Указать положение';
+  }
+  $('clearSelection').hidden = !selection;
+  $('cancelGoal').hidden = !navigating;
+  $('sendSelection').disabled = requestBusy || !serverOnline ||
+    (!(enableNavigation || locateRobot) && (!selection ||
+      (selection.tool === 'goal' ? !navigation.ready : navigation.stack_mode !== 'nav_map')));
 }
 
 function initNavigation() {
@@ -133,36 +163,39 @@ function initNavigation() {
     sessionStorage.setItem('ugvToken', $('dashboardToken').value);
     reloadMaps(); refreshServerStatus();
   });
-  $('stopBtn').addEventListener('click', emergencyStop);
   $('quickStop').addEventListener('click', emergencyStop);
   for (const name of ['joy', 'auto']) $('' + name + 'Btn').addEventListener('click', async () => {
     stopRobot();
     const result = await apiPost('/api/mode/' + name);
     if (result.ok) { mode = name.toUpperCase(); renderDriveMode(); }
   });
-  $('applyStack').addEventListener('click', async () => {
-    if (requestBusy) return;
-    requestBusy = true;
-    $('applyStack').disabled = true;
-    stopRobot();
-    $('navStatus').textContent = 'Переключение режима…';
-    try {
-      await apiPost('/api/navigation/mode', { mode: $('stackMode').value, map: $('savedMap').value });
-      await refreshServerStatus();
-    } finally { requestBusy = false; $('applyStack').disabled = false; }
+  $('applyStack').addEventListener('click', () => {
+    const chosen = document.querySelector('input[name="stackChoice"]:checked').value;
+    switchStackMode(chosen, chosen === 'nav_map' ? activeMapName : '');
   });
-  $('saveMap').addEventListener('click', async () => {
+  $('saveForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const name = $('mapName').value.trim();
+    if (!name || !/^[\p{L}\p{N}_ -]{1,64}$/u.test(name)) {
+      $('saveMessage').textContent = 'Используйте буквы, цифры, пробелы и дефисы';
+      $('saveMessage').classList.add('error'); return;
+    }
     $('saveMap').disabled = true;
+    $('saveMessage').textContent = 'Сохраняем карту на роботе…';
+    $('saveMessage').classList.remove('error');
     try {
-      const data = await apiPost('/api/maps/save', { name: $('mapName').value.trim() });
-      if (data.ok) { await reloadMaps(); $('savedMap').value = data.map; }
+      const data = await apiPost('/api/maps/save', { name });
+      if (data.ok) {
+        await reloadMaps(); $('savedMap').value = data.map;
+        $('mapName').value = ''; closeDialogs(); notifyUser(`Карта «${name}» сохранена`);
+      } else { $('saveMessage').textContent = data.error; $('saveMessage').classList.add('error'); }
     } finally { $('saveMap').disabled = false; }
   });
   $('reloadMaps').addEventListener('click', reloadMaps);
   $('showCostmap').addEventListener('change', drawMap);
   $('toolPan').addEventListener('click', () => setMapTool('pan'));
   $('toolGoal').addEventListener('click', () => setMapTool('goal'));
-  $('toolPose').addEventListener('click', () => setMapTool('pose'));
+  $('toolPose').addEventListener('click', () => { closeDialogs(); setMapTool('pose'); });
   $('clearSelection').addEventListener('click', () => { selection = null; updateSelectionStatus(); drawMap(); });
   $('cancelGoal').addEventListener('click', async () => {
     stopRobot(); await apiPost('/api/navigation/cancel'); plannedPath = []; await refreshServerStatus();
@@ -171,6 +204,8 @@ function initNavigation() {
     stopRobot(); await apiPost('/api/localization/global'); await refreshServerStatus();
   });
   $('sendSelection').addEventListener('click', async () => {
+    if (!selection && navigation.stack_mode === 'mapping') { await switchStackMode('nav_slam'); return; }
+    if (!selection && navigation.stack_mode === 'nav_map' && !navigation.ready) { setMapTool('pose'); return; }
     if (!selection || requestBusy) return;
     requestBusy = true;
     updateSelectionStatus();
@@ -191,9 +226,13 @@ function initNavigation() {
 function mapGeometry() {
   if (!mapMsg) return null;
   const info = mapMsg.info;
-  const scale = Math.min(canvas.width / info.width, canvas.height / info.height) * mapView.zoom;
-  return { info, scale, ox: (canvas.width - info.width * scale) / 2 + mapView.panX,
-    oy: (canvas.height - info.height * scale) / 2 + mapView.panY };
+  const dpr = window.devicePixelRatio || 1, mobile = window.innerWidth <= 680;
+  const left = (mobile ? 15 : 38) * dpr, right = (mobile ? 64 : 95) * dpr;
+  const top = 55 * dpr, bottom = (mobile ? 235 : 145) * dpr;
+  const width = Math.max(1, canvas.width - left - right), height = Math.max(1, canvas.height - top - bottom);
+  const scale = Math.min(width / info.width, height / info.height) * mapView.zoom;
+  return { info, scale, ox: left + (width - info.width * scale) / 2 + mapView.panX,
+    oy: top + (height - info.height * scale) / 2 + mapView.panY };
 }
 
 function worldToCanvas(x, y) {
@@ -279,7 +318,7 @@ function getMapRaster(msg) {
   const pixels = context.createImageData(width, height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const value = msg.data[y * width + x];
-    const color = value === -1 || value === 255 ? [13, 17, 23] : value >= 65 ? [248, 250, 252] : value <= 20 ? [75, 85, 99] : [156, 163, 175];
+    const color = value === -1 || value === 255 ? mapPalette.unknown : value >= 65 ? mapPalette.wall : value <= 20 ? mapPalette.free : mapPalette.free.map((v, i) => Math.round((v + mapPalette.wall[i]) / 2));
     const index = ((height - y - 1) * width + x) * 4;
     pixels.data.set([...color, 255], index);
   }
@@ -323,8 +362,8 @@ function drawCostmap() {
 function drawNavigation(info) {
   ctx.save();
   const dpr = window.devicePixelRatio || 1;
-  if (plannedPath.length && navigation.goal_state === 'navigating') {
-    ctx.strokeStyle = '#22D3EE'; ctx.lineWidth = 2 * dpr; ctx.beginPath();
+  if ($('showPath').checked && plannedPath.length && navigation.goal_state === 'navigating') {
+    ctx.strokeStyle = mapPalette.path; ctx.lineWidth = 3 * dpr; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.beginPath();
     plannedPath.forEach((point, index) => {
       const p = worldToCanvas(point.x, point.y);
       if (index) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y);
@@ -341,7 +380,7 @@ function drawNavigation(info) {
     ctx.lineTo(23 * dpr, -6 * dpr); ctx.moveTo(32 * dpr, 0); ctx.lineTo(23 * dpr, 6 * dpr); ctx.stroke();
     ctx.restore();
   }
-  if (navigation.goal && ['pending', 'navigating', 'succeeded'].includes(navigation.goal_state)) arrow(navigation.goal, '#86EFAC');
-  if (selection) arrow(selection, selection.tool === 'pose' ? '#FCD34D' : '#22D3EE');
+  if (navigation.goal && ['pending', 'navigating', 'succeeded'].includes(navigation.goal_state)) arrow(navigation.goal, mapPalette.goal);
+  if (selection) arrow(selection, selection.tool === 'pose' ? mapPalette.pose : mapPalette.selection);
   ctx.restore();
 }

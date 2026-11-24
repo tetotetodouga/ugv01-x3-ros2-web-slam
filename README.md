@@ -237,3 +237,7 @@ this project is still moving, so the next things i want to add are:
 this is a work-in-progress robot project built around the waveshare ugv01-x3, ros 2 jazzy and a web dashboard. the current version already works, but it is still experimental and will keep changing.
 
 the goal is simple: build a small but real ros 2 mobile robot platform — basically a cool little machine for my plush teto, with mapping, web control, autonomous modes and eventually nav2.
+
+## Веб-пульт «Тёмный пульт»
+
+Карта на весь экран, галерея сохранённых карт с превью, окно сохранения и адаптация под телефон. Все режимы сохранены; диагностика находится в настройках. Секретная тема Hello Kitty включается пятью нажатиями на X3 или сердечком на карте. [Руководство по интерфейсу](docs/WEB_RU.md).

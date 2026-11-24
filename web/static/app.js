@@ -1,16 +1,5 @@
 const $ = (id) => document.getElementById(id);
 
-    const I18N = {
-      ru: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · джойстик /cmd_vel · ROS 2 Jazzy", map: "Живая /map", status: "Телеметрия", control: "Управление", connecting: "Подключение", online: "Онлайн", offline: "Офлайн" },
-      en: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · joystick /cmd_vel · ROS 2 Jazzy", map: "Live /map", status: "Telemetry", control: "Drive control", connecting: "Connecting", online: "Online", offline: "Offline" },
-      ja: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map・ジョイスティック /cmd_vel・ROS 2 Jazzy", map: "ライブ /map", status: "テレメトリ", control: "走行制御", connecting: "接続中", online: "オンライン", offline: "オフライン" },
-      zh: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · 摇杆 /cmd_vel · ROS 2 Jazzy", map: "实时 /map", status: "遥测", control: "驾驶控制", connecting: "连接中", online: "在线", offline: "离线" },
-      ko: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · 조이스틱 /cmd_vel · ROS 2 Jazzy", map: "실시간 /map", status: "텔레메트리", control: "주행 제어", connecting: "연결 중", online: "온라인", offline: "오프라인" },
-      es: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · joystick /cmd_vel · ROS 2 Jazzy", map: "Mapa /map", status: "Telemetría", control: "Control", connecting: "Conectando", online: "Online", offline: "Offline" },
-      pl: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · joystick /cmd_vel · ROS 2 Jazzy", map: "Mapa /map", status: "Telemetria", control: "Sterowanie", connecting: "Łączenie", online: "Online", offline: "Offline" },
-      hi: { title: "UGV01-X3 ROS 2 Dashboard", subtitle: "2D SLAM /map · joystick /cmd_vel · ROS 2 Jazzy", map: "लाइव /map", status: "Telemetry", control: "Drive control", connecting: "Connecting", online: "Online", offline: "Offline" }
-    };
-
     const wsUrlInput = $("wsUrl");
     wsUrlInput.value = `ws://${location.hostname || "127.0.0.1"}:9090`;
 
@@ -69,8 +58,7 @@ const $ = (id) => document.getElementById(id);
       connected = state === "ok";
       const dot = $("connDot");
       dot.className = "dot " + (connected ? "ok" : state === "bad" ? "bad" : "warn");
-      const lang = I18N[$("lang").value] || I18N.ru;
-      $("connText").textContent = connected ? lang.online : state === "bad" ? lang.offline : lang.connecting;
+      $("connText").textContent = connected ? 'На связи' : state === 'bad' ? 'Нет связи' : 'Подключение';
     }
 
     function connect() {
@@ -135,7 +123,7 @@ const $ = (id) => document.getElementById(id);
 
           if (data.topic === "/map") {
             mapMsg = data.msg;
-            $("mapInfo").textContent = `map: ${mapMsg.info.width}×${mapMsg.info.height}`;
+            $("mapInfo").textContent = `${(mapMsg.info.width * mapMsg.info.resolution).toFixed(1)} × ${(mapMsg.info.height * mapMsg.info.resolution).toFixed(1)} м`;
             drawMap();
           }
 
@@ -240,6 +228,17 @@ const $ = (id) => document.getElementById(id);
 
     const canvas = $("mapCanvas");
     const ctx = canvas.getContext("2d");
+    let mapPalette = {};
+
+    function updateMapPalette() {
+      const style = getComputedStyle(document.documentElement);
+      const get = name => style.getPropertyValue('--' + name).trim();
+      const rgb = value => [1, 3, 5].map(offset => parseInt(value.slice(offset, offset + 2), 16));
+      mapPalette = { bg: get('map-bg'), grid: get('map-grid'), path: get('path'),
+        robot: get('robot'), outline: get('robot-outline'), goal: get('goal'),
+        selection: get('selection'), pose: get('pose'),
+        unknown: rgb(get('map-unknown')), free: rgb(get('map-free')), wall: rgb(get('map-wall')) };
+    }
 
     function resizeCanvas() {
       const r = canvas.getBoundingClientRect();
@@ -253,10 +252,10 @@ const $ = (id) => document.getElementById(id);
       const w = canvas.width;
       const h = canvas.height;
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = "#090A0F";
+      ctx.fillStyle = mapPalette.bg;
       ctx.fillRect(0, 0, w, h);
 
-      ctx.strokeStyle = "rgba(255,255,255,0.035)";
+      ctx.strokeStyle = mapPalette.grid;
       ctx.lineWidth = 1;
       const gridStep = 64 * (window.devicePixelRatio || 1);
       for (let gx = 0; gx < w; gx += gridStep) {
@@ -273,9 +272,7 @@ const $ = (id) => document.getElementById(id);
       }
 
       if (!mapMsg) {
-        ctx.fillStyle = "#64748B";
-        ctx.font = `${14 * (window.devicePixelRatio || 1)}px ${getComputedStyle(document.body).fontFamily}`;
-        ctx.fillText("waiting for /map", 24, 36);
+        $('mapEmpty').hidden = false;
         return;
       }
 
@@ -284,21 +281,14 @@ const $ = (id) => document.getElementById(id);
       const mh = info.height;
       const data = mapMsg.data;
 
-      const fitScale = Math.min(w / mw, h / mh);
-      const scale = fitScale * mapView.zoom;
-      const ox = (w - mw * scale) / 2 + mapView.panX;
-      const oy = (h - mh * scale) / 2 + mapView.panY;
+      const { scale, ox, oy } = mapGeometry();
 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(getMapRaster(mapMsg), ox, oy, mw * scale, mh * scale);
       drawCostmap();
 
       const hasKnown = Array.prototype.some.call(data, v => v !== -1 && v !== 255);
-      if (!hasKnown) {
-        ctx.fillStyle = "rgba(226,232,240,0.80)";
-        ctx.font = `${13 * (window.devicePixelRatio || 1)}px ${getComputedStyle(document.body).fontFamily}`;
-        ctx.fillText("EMPTY MAP: move robot or wait for SLAM", 24, 36);
-      }
+      $('mapEmpty').hidden = hasKnown;
 
       drawNavigation(info, scale, ox, oy, mh);
       if (robotPose && Date.now() - robotPoseAt < 2200) drawRobotOnMap(info, scale, ox, oy, mh);
@@ -313,23 +303,21 @@ const $ = (id) => document.getElementById(id);
       ctx.translate(px, py);
       ctx.rotate(-(robotPose.yaw - quatYaw(info.origin.orientation)));
 
-      ctx.strokeStyle = "#090A0F";
-      ctx.lineWidth = Math.max(2, 3 * (window.devicePixelRatio || 1));
-
-      ctx.fillStyle = "#F8FAFC";
-      ctx.strokeStyle = "#020617";
-      ctx.lineWidth = Math.max(3, 4 * (window.devicePixelRatio || 1));
+      const dpr = window.devicePixelRatio || 1;
+      ctx.fillStyle = mapPalette.robot;
+      ctx.strokeStyle = mapPalette.outline;
+      ctx.lineWidth = 2.5 * dpr;
 
       ctx.beginPath();
-      ctx.moveTo(34, 0);
-      ctx.lineTo(-20, -18);
-      ctx.lineTo(-12, 0);
-      ctx.lineTo(-20, 18);
+      ctx.moveTo(20 * dpr, 0);
+      ctx.lineTo(-13 * dpr, -12 * dpr);
+      ctx.lineTo(-8 * dpr, 0);
+      ctx.lineTo(-13 * dpr, 12 * dpr);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = "#020617";
+      ctx.fillStyle = mapPalette.outline;
       ctx.beginPath();
       ctx.arc(0, 0, 5 * (window.devicePixelRatio || 1), 0, Math.PI * 2);
       ctx.fill();
@@ -408,8 +396,9 @@ const $ = (id) => document.getElementById(id);
 
     window.addEventListener("keydown", (e) => {
       if (e.target.closest("input,select,textarea")) return;
-      const k = e.key.toLowerCase();
-      if (k in keys && mode === "JOY") {
+      const arrows = { ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd' };
+      const k = arrows[e.key] || e.key.toLowerCase();
+      if (k in keys && mode === "JOY" && !$('drivePanel').hidden && !document.querySelector('dialog[open]')) {
         keys[k] = true;
         setKeyVisual();
         e.preventDefault();
@@ -421,7 +410,8 @@ const $ = (id) => document.getElementById(id);
     });
 
     window.addEventListener("keyup", (e) => {
-      const k = e.key.toLowerCase();
+      const arrows = { ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd' };
+      const k = arrows[e.key] || e.key.toLowerCase();
       if (k in keys) {
         keys[k] = false;
         setKeyVisual();
@@ -430,28 +420,20 @@ const $ = (id) => document.getElementById(id);
     });
 
 
-    $("lang").addEventListener("change", () => {
-      const t = I18N[$("lang").value] || I18N.ru;
-      $("t-title").textContent = t.title;
-      $("t-subtitle").textContent = t.subtitle;
-      $("t-map").textContent = t.map;
-      $("t-status").textContent = t.status;
-      $("t-control").textContent = t.control;
-      $("connText").textContent = connected ? t.online : t.connecting;
-    });
-
     wsUrlInput.addEventListener("change", connect);
 
 
     function zoomMapAt(factor, cx = canvas.width / 2, cy = canvas.height / 2) {
+      if (!mapMsg) return;
+      const before = mapGeometry();
       const oldZoom = mapView.zoom;
       const newZoom = Math.min(16, Math.max(0.35, oldZoom * factor));
       const k = newZoom / oldZoom;
 
-      mapView.panX = (cx - canvas.width / 2) * (1 - k) + mapView.panX * k;
-      mapView.panY = (cy - canvas.height / 2) * (1 - k) + mapView.panY * k;
       mapView.zoom = newZoom;
-
+      const after = mapGeometry();
+      mapView.panX += cx - (after.ox + (cx - before.ox) * k);
+      mapView.panY += cy - (after.oy + (cy - before.oy) * k);
       drawMap();
     }
 
@@ -468,6 +450,8 @@ const $ = (id) => document.getElementById(id);
     if ($("zoomFit")) $("zoomFit").addEventListener("click", fitMapView);
 
     window.addEventListener("resize", resizeCanvas);
+    new ResizeObserver(resizeCanvas).observe(canvas.parentElement);
+    initDashboard();
     initNavigation();
     initMapEvents();
     resizeCanvas();

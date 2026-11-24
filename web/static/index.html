@@ -1,785 +1,94 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>UGV01-X3 ROS 2 Dashboard</title>
-  <style>
-    :root {
-      --bg: #0B0C10;
-      --panel: #12141C;
-      --panel2: #0F1118;
-      --line: rgba(255,255,255,0.055);
-      --line2: rgba(255,255,255,0.09);
-      --text: #E2E8F0;
-      --muted: #64748B;
-      --muted2: #94A3B8;
-      --white: #F1F3F9;
-      --black: #090A0F;
-      --danger: #FF4D6D;
-      --ok: #86EFAC;
-      --warn: #FCD34D;
-      --mono: "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
-      --sans: Inter, "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background:
-        radial-gradient(circle at 80% 10%, rgba(255,255,255,0.035), transparent 34rem),
-        linear-gradient(180deg, #0B0C10 0%, #08090D 100%);
-      color: var(--text);
-      font-family: var(--sans);
-      overflow-x: hidden;
-    }
-
-    button, input, select {
-      font: inherit;
-    }
-
-    .app {
-      width: min(1500px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 22px 0 28px;
-    }
-
-    .topbar {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 20px;
-      align-items: center;
-      padding: 18px;
-      background: rgba(18,20,28,0.92);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.28);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 0;
-    }
-
-    .mark {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      border-radius: 8px;
-      background: #0B0D13;
-      border: 1px solid var(--line2);
-      color: var(--white);
-      font-family: var(--mono);
-      font-weight: 800;
-      letter-spacing: -0.04em;
-    }
-
-    .brand h1 {
-      margin: 0;
-      font-size: 16px;
-      line-height: 1.15;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-
-    .brand p {
-      margin: 4px 0 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    .top-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .chip, .field, .lang {
-      min-height: 40px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: #0D0F15;
-      color: var(--muted2);
-      padding: 0 14px;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-    }
-
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-    }
-
-    .dot.ok { background: var(--ok); }
-    .dot.warn { background: var(--warn); }
-    .dot.bad { background: var(--danger); }
-
-    .field {
-      width: 170px;
-      outline: none;
-      font-family: var(--mono);
-    }
-
-    .lang {
-      color: var(--text);
-      outline: none;
-      cursor: pointer;
-    }
-
-    .grid {
-      margin-top: 22px;
-      display: grid;
-      grid-template-columns: minmax(420px, 1.35fr) minmax(360px, 0.75fr);
-      gap: 22px;
-    }
-
-    .panel {
-      background: rgba(18,20,28,0.94);
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.22);
-      overflow: hidden;
-    }
-
-    .panel-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      background: rgba(255,255,255,0.012);
-    }
-
-    .panel-title {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .panel-title strong {
-      font-size: 14px;
-      letter-spacing: -0.01em;
-    }
-
-    .panel-title span {
-      color: var(--muted);
-      font-size: 12px;
-      font-family: var(--mono);
-    }
-
-    .mode-strip {
-      display: flex;
-      background: #0B0D13;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 3px;
-      gap: 3px;
-    }
-
-    .mode-btn {
-      border: 0;
-      border-radius: 6px;
-      padding: 9px 13px;
-      background: transparent;
-      color: var(--muted2);
-      cursor: pointer;
-      font-weight: 800;
-      font-size: 12px;
-      letter-spacing: 0.04em;
-      transition: background .18s ease, color .18s ease;
-    }
-
-    .mode-btn.active {
-      background: var(--white);
-      color: var(--black);
-    }
-
-    .stop {
-      border-radius: 8px;
-      border: 1px solid rgba(255,77,109,0.38);
-      background: rgba(255,77,109,0.055);
-      color: var(--danger);
-      padding: 10px 14px;
-      font-weight: 900;
-      letter-spacing: 0.05em;
-      cursor: pointer;
-      transition: border-color .18s ease, background .18s ease;
-    }
-
-    .stop:hover {
-      border-color: rgba(255,77,109,0.75);
-      background: rgba(255,77,109,0.10);
-    }
-
-    .map-wrap {
-      position: relative;
-      height: min(64vh, 690px);
-      min-height: 430px;
-      background: #090A0F;
-    }
-
-    #mapCanvas {
-      display: block;
-      cursor: grab;
-      touch-action: none;
-      cursor: grab;
-      touch-action: none;
-      width: 100%;
-      height: 100%;
-      image-rendering: pixelated;
-    }
-
-
-    .map-controls {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      display: flex;
-      gap: 6px;
-      z-index: 5;
-    }
-
-    .map-control {
-      width: 38px;
-      height: 34px;
-      border-radius: 8px;
-      border: 1px solid rgba(255,255,255,0.08);
-      background: rgba(9,10,15,0.82);
-      color: #E2E8F0;
-      font-family: var(--mono);
-      font-weight: 900;
-      cursor: pointer;
-      transition: background .15s ease, border-color .15s ease;
-    }
-
-    .map-control:hover {
-      background: rgba(241,243,249,0.12);
-      border-color: rgba(255,255,255,0.18);
-    }
-
-    .map-control.fit {
-      width: 54px;
-    }
-
-    .map-hud {
-      position: absolute;
-      left: 16px;
-      bottom: 16px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      pointer-events: none;
-    }
-
-    .hud-item {
-      padding: 7px 9px;
-      border-radius: 7px;
-      background: rgba(9,10,15,0.76);
-      border: 1px solid var(--line);
-      color: var(--muted2);
-      font-family: var(--mono);
-      font-size: 11px;
-      backdrop-filter: blur(8px);
-    }
-
-    .side {
-      display: grid;
-      gap: 22px;
-      align-content: start;
-    }
-
-    .status-grid {
-      padding: 16px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .stat {
-      min-height: 76px;
-      padding: 12px;
-      border-radius: 8px;
-      background: #0D0F15;
-      border: 1px solid var(--line);
-    }
-
-    .stat span {
-      display: block;
-      color: var(--muted);
-      font-size: 11px;
-      font-family: var(--mono);
-      margin-bottom: 8px;
-    }
-
-    .stat strong {
-      font-family: var(--mono);
-      font-size: 15px;
-      font-weight: 800;
-    }
-
-    .control-body {
-      padding: 16px;
-    }
-
-    .joy-zone {
-      position: relative;
-      height: 320px;
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      background:
-        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-        #090B10;
-      background-size: 50% 50%;
-      overflow: hidden;
-      touch-action: none;
-      user-select: none;
-    }
-
-    .joy-cross-v, .joy-cross-h {
-      position: absolute;
-      background: rgba(255,255,255,0.075);
-      pointer-events: none;
-    }
-
-    .joy-cross-v {
-      width: 1px;
-      height: 78%;
-      left: 50%;
-      top: 11%;
-    }
-
-    .joy-cross-h {
-      height: 1px;
-      width: 78%;
-      left: 11%;
-      top: 50%;
-    }
-
-    .joy-ring {
-      position: absolute;
-      width: 148px;
-      height: 148px;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 50%;
-      pointer-events: none;
-    }
-
-    .joy-ring::after {
-      content: "";
-      position: absolute;
-      inset: 20px;
-      border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 50%;
-    }
-
-    .joy-vector {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 2px;
-      height: 0;
-      transform-origin: bottom center;
-      background: rgba(241,243,249,0.55);
-      pointer-events: none;
-    }
-
-    .joy-knob {
-      position: absolute;
-      width: 60px;
-      height: 60px;
-      left: calc(50% - 30px);
-      top: calc(50% - 30px);
-      border-radius: 50%;
-      background: #E2E8F0;
-      border: 1px solid rgba(255,255,255,0.65);
-      box-shadow: 0 10px 28px rgba(0,0,0,0.36);
-      display: grid;
-      place-items: center;
-      color: #090A0F;
-      font-family: var(--mono);
-      font-weight: 900;
-      pointer-events: none;
-    }
-
-    .joy-knob::after {
-      content: "";
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #090A0F;
-    }
-
-    .wasd {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .key {
-      min-height: 42px;
-      border-radius: 8px;
-      border: 1px solid var(--line);
-      background: #0D0F15;
-      color: var(--muted);
-      display: grid;
-      place-items: center;
-      font-family: var(--mono);
-      font-weight: 900;
-      transition: background .12s ease, color .12s ease, border-color .12s ease;
-    }
-
-    .key.active {
-      background: var(--white);
-      color: var(--black);
-      border-color: var(--white);
-    }
-
-    .key.empty {
-      opacity: 0;
-    }
-
-    .log {
-      padding: 14px 16px;
-      height: 118px;
-      overflow: auto;
-      background: #090A0F;
-      border-top: 1px solid var(--line);
-      font-family: var(--mono);
-      color: var(--muted2);
-      font-size: 11px;
-      line-height: 1.55;
-    }
-
-    .topic-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 0 16px 16px;
-    }
-
-    .topic-pill {
-      border: 1px solid var(--line);
-      background: #0D0F15;
-      color: var(--muted2);
-      border-radius: 999px;
-      padding: 7px 9px;
-      font-family: var(--mono);
-      font-size: 11px;
-    }
-
-    @media (max-width: 920px) {
-      .app {
-        width: min(100vw - 20px, 720px);
-        padding: 10px 0 18px;
-      }
-
-      .topbar {
-        grid-template-columns: 1fr;
-        padding: 14px;
-      }
-
-      .top-actions {
-        justify-content: stretch;
-      }
-
-      .chip, .field, .lang {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .grid {
-        grid-template-columns: 1fr;
-        gap: 14px;
-        margin-top: 14px;
-      }
-
-      .map-wrap {
-        height: 46vh;
-        min-height: 310px;
-      }
-
-      .side {
-        gap: 14px;
-      }
-
-      .status-grid {
-        grid-template-columns: 1fr 1fr;
-        padding: 12px;
-      }
-
-      .joy-zone {
-        height: 300px;
-      }
-
-      .panel-head {
-        padding: 14px;
-      }
-
-      .brand h1 {
-        font-size: 15px;
-      }
-    }
-
-    @media (max-width: 520px) {
-      .top-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .field, .lang {
-        grid-column: span 1;
-      }
-
-      .status-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .map-wrap {
-        height: 42vh;
-      }
-    }
-  
-    /* Mobile UX: map -> joystick -> telemetry */
-    @media (max-width: 920px) {
-      .side {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .side .panel:nth-child(2) {
-        order: 1;
-      }
-
-      .side .panel:nth-child(1) {
-        order: 2;
-      }
-
-      .joy-zone {
-        height: 280px;
-      }
-
-      .wasd {
-        display: none;
-      }
-
-      .status-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-
-    @media (max-width: 520px) {
-      .map-wrap {
-        height: 38vh;
-        min-height: 300px;
-      }
-
-      .joy-zone {
-        height: 270px;
-      }
-
-      .control-body {
-        padding: 12px;
-      }
-
-      .status-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-
-      .stat {
-        min-height: 64px;
-      }
-    }
-
-  
-    .nav-panel { padding: 14px 16px; border-top: 1px solid var(--line); }
-    .nav-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-    .nav-row > input, .nav-row > select { flex: 1; min-width: 130px; }
-    .nav-row button, .nav-row select, .nav-row input {
-      min-height: 42px; border-radius: 7px; border: 1px solid var(--line2);
-      background: #0D0F15; color: var(--text); padding: 9px 12px;
-    }
-    .nav-row button { cursor: pointer; }
-    .nav-row button.active { background: var(--white); color: var(--black); }
-    button:disabled { opacity: .4; cursor: default; }
-    .nav-hint { color: var(--muted2); font-size: 12px; line-height: 1.5; margin: 8px 0; }
-    #navStatus { color: var(--warn); overflow-wrap: anywhere; }
-    #navStatus.ready { color: var(--ok); }
-    #mapCanvas { touch-action: none; }
-    @media (max-width: 920px) {
-      #quickStop { position: fixed; right: 16px; bottom: 16px; z-index: 100;
-        min-width: 96px; background: #32101B; box-shadow: 0 4px 24px #0008; }
-    }
-</style>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#171c21" /><title>X3 · Пульт управления</title>
+  <link rel="stylesheet" href="/dashboard.css?v=3" />
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem('x3-theme')||'dark'}catch(e){}</script>
 </head>
-
 <body>
-  <main class="app">
+  <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5Zm6-2v16m6-14v16"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="m10 3-1 3-3 1-3 3v4l3 1 1 3 3 3h4l1-3 3-1 3-3v-4l-3-1-1-3-3-3h-4Z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/></symbol>
+    <symbol id="i-game" viewBox="0 0 24 24"><path d="M7 7h10c3 0 4 5 4 8s-2 4-4 2l-2-2H9l-2 2c-2 2-4 1-4-2s1-8 4-8Zm0 3v4m-2-2h4"/><circle cx="16" cy="11" r=".6"/><circle cx="18" cy="13" r=".6"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M4 3h13l3 3v15H4V3Zm4 0v6h8V3M8 21v-7h8v7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8V4Z"/></symbol>
+    <symbol id="i-pan" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M6 9l-3 3 3 3m3 3 3 3 3-3m3-12 3 3-3 3"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20 5c-3-3-7-1-8 1-1-2-5-4-8-1-5 5 3 11 8 15 5-4 13-10 8-15Z"/></symbol>
+  </defs></svg>
+  <main class="cockpit">
     <header class="topbar">
-      <div class="brand">
-        <div class="mark">X3</div>
-        <div>
-          <h1 id="t-title">UGV01-X3 ROS 2 Dashboard</h1>
-          <p id="t-subtitle">2D SLAM /map · joystick /cmd_vel · ROS 2 Jazzy</p>
-        </div>
-      </div>
-
-      <div class="top-actions">
-        <button id="quickStop" class="stop">STOP</button>
-        <div class="chip"><span id="connDot" class="dot warn"></span><span id="connText">Connecting</span></div>
-        <input id="wsUrl" class="field" />
-        <input id="dashboardToken" class="field" type="password" placeholder="Токен (если задан)" aria-label="Dashboard token" />
-        <select id="lang" class="lang">
-          <option value="ru">Русский</option>
-          <option value="en">English</option>
-          <option value="ja">日本語</option>
-          <option value="zh">中文</option>
-          <option value="ko">한국어</option>
-          <option value="es">Español</option>
-          <option value="pl">Polski</option>
-          <option value="hi">हिन्दी</option>
-        </select>
-      </div>
+      <button class="brand" id="brandSecret" title="X3" aria-label="X3"><span class="brand-mark">X3</span><span class="brand-name">Пульт управления</span></button>
+      <span class="connection"><span id="connDot" class="dot warn"></span><span id="connText">Подключение</span></span>
+      <span class="top-divider"></span>
+      <button id="openMaps" class="map-switch"><svg><use href="#i-map"/></svg><span id="currentMapName">Новая карта</span><svg class="chevron"><use href="#i-down"/></svg></button>
+      <div class="top-spacer"></div>
+      <button id="openSave" class="icon-button save-shortcut" title="Сохранить карту" aria-label="Сохранить карту"><svg><use href="#i-save"/></svg></button>
+      <button id="openSettings" class="icon-button" title="Настройки" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button>
+      <button id="quickStop" class="stop-button"><span class="stop-square"></span>STOP</button>
     </header>
-
-    <section class="grid">
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">
-            <strong id="t-map">Live /map</strong>
-            <span>/map · /odom · occupancy grid</span>
-          </div>
-
-          <div class="mode-strip">
-            <button id="autoBtn" class="mode-btn">AUTO</button>
-            <button id="joyBtn" class="mode-btn active">JOY</button>
-          </div>
-        </div>
-
-        <div class="nav-panel">
-          <div class="nav-row">
-            <select id="stackMode" aria-label="Режим карты">
-              <option value="mapping">SLAM · JOY / AUTO</option>
-              <option value="nav_slam">Nav2 + SLAM · неизвестная карта</option>
-              <option value="nav_map">Nav2 + готовая карта · AMCL</option>
-            </select>
-            <select id="savedMap" aria-label="Сохранённая карта"><option value="">Нет сохранённых карт</option></select>
-            <button id="applyStack">Запустить режим</button>
-          </div>
-          <div class="nav-row">
-            <input id="mapName" placeholder="Имя новой карты" aria-label="Имя новой карты" maxlength="64" />
-            <button id="saveMap">Сохранить карту</button>
-            <button id="reloadMaps">Обновить список</button>
-          </div>
-          <div class="nav-row">
-            <button id="toolPan" class="active">Обзор</button>
-            <button id="toolGoal">Поставить цель</button>
-            <button id="toolPose">Начальная поза</button>
-            <button id="globalPose">Найти себя · AMCL</button>
-            <button id="cancelGoal">Отменить цель</button>
-          </div>
-          <div class="nav-row">
-            <button id="sendSelection" disabled>Отправить выбранную точку</button>
-            <button id="clearSelection">Сбросить выбор</button>
-          </div>
-          <label class="nav-hint"><input id="showCostmap" type="checkbox" checked /> Зоны препятствий Nav2 · жёлтые и красные</label>
-          <p class="nav-hint">Выберите «Цель» или «Начальная поза». Нажмите на карту и потяните в нужном направлении, затем отправьте точку. Работает мышью и касанием. В SLAM можно выбирать неизвестные клетки внутри текущей карты.</p>
-          <p id="navStatus" class="nav-hint" role="status">Ожидание сервера…</p>
-          <p id="selectionStatus" class="nav-hint">Точка не выбрана</p>
-        </div>
-
-        <div class="map-wrap">
-          <canvas id="mapCanvas"></canvas>
-          <div class="map-controls">
-            <button id="zoomIn" class="map-control">+</button>
-            <button id="zoomOut" class="map-control">−</button>
-            <button id="zoomFit" class="map-control fit">FIT</button>
-          </div>
-
-          <div class="map-hud">
-            <div class="hud-item">unknown</div>
-            <div class="hud-item">free</div>
-            <div class="hud-item">occupied</div>
-            <div class="hud-item" id="mapInfo">map: waiting</div>
-          </div>
-        </div>
+    <section class="workspace" aria-label="Карта и управление">
+      <canvas id="mapCanvas" aria-label="Карта робота. Выберите цель или перемещайте карту"></canvas>
+      <div class="map-empty" id="mapEmpty"><svg><use href="#i-map"/></svg><h1>Здесь появится карта</h1><p id="emptyMapText">Подключаемся к роботу…</p></div>
+      <div class="map-label"><span class="live-point"></span><span id="mapModeLabel">Живая карта</span><span class="map-label-divider"></span><span id="mapInfo">Ожидание карты</span></div>
+      <div class="map-toolbar" aria-label="Инструменты карты">
+        <button id="toggleLayers" class="icon-button" title="Слои карты" aria-label="Слои карты" aria-expanded="false"><svg><use href="#i-layers"/></svg></button><span class="toolbar-rule"></span>
+        <button id="zoomIn" class="icon-button" title="Приблизить" aria-label="Приблизить"><svg><use href="#i-plus"/></svg></button>
+        <button id="zoomOut" class="icon-button" title="Отдалить" aria-label="Отдалить"><svg><use href="#i-minus"/></svg></button>
+        <button id="zoomFit" class="icon-button" title="Показать всю карту" aria-label="Показать всю карту"><svg><use href="#i-fit"/></svg></button>
+      </div>
+      <section id="layersPopover" class="layers-popover floating" hidden><strong>На карте</strong><label class="switch-row">Зоны препятствий<input id="showCostmap" type="checkbox" checked /></label><label class="switch-row">Маршрут<input id="showPath" type="checkbox" checked /></label></section>
+      <div id="mapHint" class="map-hint" hidden><svg><use href="#i-target"/></svg><span id="mapHintText">Нажмите на карту и потяните, чтобы задать направление</span><button id="dismissMapHint" class="icon-button" aria-label="Закрыть подсказку"><svg><use href="#i-close"/></svg></button></div>
+      <section id="drivePanel" class="drive-panel floating" hidden aria-label="Ручное управление">
+        <div class="drive-panel-head"><span>Управление</span><button id="closeDrive" class="icon-button" aria-label="Скрыть управление"><svg><use href="#i-close"/></svg></button></div>
+        <div class="drive-modes"><button id="joyBtn" class="active">Вручную</button><button id="autoBtn">Автообход</button></div>
+        <div id="joyZone" class="joy-zone" role="application" aria-label="Джойстик. Удерживайте для движения"><div class="joy-ring outer"></div><div class="joy-ring inner"></div><div class="joy-cross-v"></div><div class="joy-cross-h"></div><span class="joy-direction up">⌃</span><span class="joy-direction down">⌄</span><span class="joy-direction left">‹</span><span class="joy-direction right">›</span><div id="joyVector" class="joy-vector"></div><div id="joyKnob" class="joy-knob"></div></div>
+        <div class="wasd" aria-label="Клавиши управления"><span id="keyW" class="key">W</span><span id="keyA" class="key">A</span><span id="keyS" class="key">S</span><span id="keyD" class="key">D</span><span class="key-caption">или стрелки</span></div>
+        <p id="driveHint" class="drive-hint">Отпустите джойстик, чтобы остановиться</p>
       </section>
-
-      <aside class="side">
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">
-              <strong id="t-status">Telemetry</strong>
-              <span>/cmd_vel_joy → mode manager → watchdog → /cmd_vel · /odom</span>
-            </div>
-            <button id="stopBtn" class="stop">STOP</button>
-          </div>
-
-          <div class="status-grid">
-            <div class="stat"><span>MODE</span><strong id="modeStat">JOY</strong></div>
-            <div class="stat"><span>CMD</span><strong id="cmdStat">0.00 / 0.00</strong></div>
-            <div class="stat"><span>POSE</span><strong id="poseStat">0.00 0.00</strong></div>
-            <div class="stat"><span>YAW</span><strong id="yawStat">0°</strong></div>
-          </div>
-
-          <div class="topic-list">
-            <div class="topic-pill">/cmd_vel_joy</div><div class="topic-pill">/cmd_vel_auto</div><div class="topic-pill">/cmd_vel</div>
-            <div class="topic-pill">/map</div>
-            <div class="topic-pill">/odom</div>
-            <div class="topic-pill">ws :9090</div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div class="panel-title">
-              <strong id="t-control">Drive control</strong>
-              <span>pointer joystick · WASD · stop-on-release</span>
-            </div>
-          </div>
-
-          <div class="control-body">
-            <div id="joyZone" class="joy-zone">
-              <div class="joy-cross-v"></div>
-              <div class="joy-cross-h"></div>
-              <div class="joy-ring"></div>
-              <div id="joyVector" class="joy-vector"></div>
-              <div id="joyKnob" class="joy-knob"></div>
-            </div>
-
-            <div class="wasd">
-              <div class="key empty"></div>
-              <div id="keyW" class="key">W</div>
-              <div class="key empty"></div>
-              <div id="keyA" class="key">A</div>
-              <div id="keyS" class="key">S</div>
-              <div id="keyD" class="key">D</div>
-            </div>
-          </div>
-
-          <div id="log" class="log"></div>
-        </section>
-      </aside>
+      <div class="status-float"><span id="navDot" class="dot warn"></span><span id="navStatus" role="status">Подключение к роботу</span></div>
+      <section class="command-dock floating" aria-label="Навигация">
+        <div class="dock-tools"><button id="toolGoal" class="dock-tool" disabled title="Выбрать цель"><svg><use href="#i-target"/></svg><span>Цель</span></button><button id="toggleDrive" class="dock-tool" aria-expanded="false"><svg><use href="#i-game"/></svg><span>Управление</span></button><button id="toolPan" class="dock-tool active" title="Перемещать карту"><svg><use href="#i-pan"/></svg><span>Обзор</span></button></div>
+        <span class="dock-divider"></span><div class="goal-summary"><strong id="selectionStatus">Выберите цель на карте</strong><span id="goalDetail">Робот готов к работе</span></div>
+        <button id="clearSelection" class="icon-button clear-selection" title="Сбросить точку" aria-label="Сбросить точку" hidden><svg><use href="#i-close"/></svg></button><button id="cancelGoal" class="secondary cancel-goal" hidden>Отменить</button>
+        <button id="sendSelection" class="primary go-button" disabled><svg><use href="#i-play"/></svg><span id="goLabel">Поехать</span></button>
+      </section>
+      <div class="kawaii-decoration kitty" aria-hidden="true"><img src="/sanrio-hello-kitty.png" alt="" /></div><div class="kawaii-decoration cinnamon" aria-hidden="true"><img src="/sanrio-cinnamoroll.png" alt="" /></div>
+      <button id="themeSecret" class="theme-secret" title="Hello Kitty" aria-label="Секретная тема Hello Kitty"><svg><use href="#i-heart"/></svg></button>
     </section>
   </main>
-
-  <script src="/navigation.js"></script>
-  <script src="/app.js"></script>
+  <dialog id="mapsDialog" class="maps-dialog">
+    <div class="dialog-heading"><div><span class="eyebrow">ВАШЕ ПРОСТРАНСТВО</span><h2>Карты</h2></div><button class="icon-button" data-close-dialog aria-label="Закрыть карты"><svg><use href="#i-close"/></svg></button></div>
+    <div class="map-actions"><button id="newMap" class="secondary"><svg><use href="#i-plus"/></svg>Новая карта</button><button id="saveFromMaps" class="primary"><svg><use href="#i-save"/></svg>Сохранить текущую</button></div>
+    <div class="gallery-search"><svg><use href="#i-search"/></svg><input id="mapSearch" type="search" placeholder="Найти карту" aria-label="Найти карту" /></div><div id="mapGallery" class="map-gallery" role="group" aria-label="Сохранённые карты"></div><p id="mapsMessage" class="inline-message" role="status"></p>
+    <div class="dialog-footer"><span id="mapsCount">Загрузка…</span><button id="reloadMaps" class="text-button">Обновить</button></div>
+  </dialog>
+  <dialog id="saveDialog" class="save-dialog"><form id="saveForm">
+    <div class="dialog-heading"><div><span class="eyebrow">ОСТАНЕТСЯ НА РОБОТЕ</span><h2>Сохранить карту</h2></div><button type="button" class="icon-button" data-close-dialog aria-label="Закрыть сохранение"><svg><use href="#i-close"/></svg></button></div>
+    <div class="save-preview"><canvas id="savePreview" aria-label="Превью сохраняемой карты"></canvas><span>Текущая карта</span></div><label class="field-label" for="mapName">Название</label><input id="mapName" class="text-field" placeholder="Например, Первый этаж" maxlength="64" autocomplete="off" required /><p id="saveMessage" class="inline-message" role="status"></p>
+    <div class="dialog-actions"><button type="button" class="secondary" data-close-dialog>Отмена</button><button id="saveMap" class="primary" type="submit"><svg><use href="#i-save"/></svg><span>Сохранить карту</span></button></div>
+  </form></dialog>
+  <dialog id="settingsDialog" class="settings-dialog">
+    <div class="dialog-heading"><div><span class="eyebrow">X3</span><h2>Настройки</h2></div><button class="icon-button" data-close-dialog aria-label="Закрыть настройки"><svg><use href="#i-close"/></svg></button></div>
+    <section class="settings-section"><h3>Режим работы</h3><div class="stack-options" id="stackOptions">
+      <label><input type="radio" name="stackChoice" value="nav_slam" checked /><span><strong>Навигация и новая карта</strong><small>Ехать к цели и строить карту по пути</small></span></label>
+      <label><input type="radio" name="stackChoice" value="nav_map" /><span><strong>Навигация по готовой карте</strong><small>Выберите сохранённую карту в галерее</small></span></label>
+      <label><input type="radio" name="stackChoice" value="mapping" /><span><strong>Только построение карты</strong><small>Ручное управление и автообход</small></span></label>
+    </div><button id="applyStack" class="secondary full-width">Применить режим</button></section>
+    <section class="settings-section" id="localizationSettings"><h3>Положение на карте</h3><div class="button-row"><button id="toolPose" class="secondary" disabled><svg><use href="#i-target"/></svg>Указать положение</button><button id="globalPose" class="secondary" disabled><svg><use href="#i-locate"/></svg>Найти робота</button></div><p class="field-help">Для сохранённой карты. После выбора положения задайте направление на карте.</p></section>
+    <details class="settings-section connection-details"><summary>Подключение и диагностика</summary><label class="field-label" for="wsUrl">Адрес WebSocket</label><input id="wsUrl" class="text-field" spellcheck="false" /><label class="field-label" for="dashboardToken">Токен доступа</label><input id="dashboardToken" class="text-field" type="password" placeholder="Если настроен" autocomplete="off" /><div class="telemetry"><div><span>Режим</span><strong id="modeStat">JOY</strong></div><div><span>Команда, м/с · рад/с</span><strong id="cmdStat">— / —</strong></div><div><span>Положение, м</span><strong id="poseStat">—</strong></div><div><span>Направление</span><strong id="yawStat">—</strong></div></div><div id="log" class="log" aria-label="Журнал событий"></div></details>
+    <div class="settings-footer"><span>UGV01-X3 · ROS 2</span><button id="themeSettings" class="text-button" hidden>Вернуть тёмную тему</button></div><div id="sanrioCredit" class="sanrio-credit" hidden>Персонажи © Sanrio · <a href="https://corporate.sanrio.co.jp/en/business-info/brands/hello_kity/index.html" target="_blank" rel="noreferrer">Hello Kitty</a> · <a href="https://www.sanrio.co.jp/characters/cinnamon/" target="_blank" rel="noreferrer">Cinnamoroll</a></div>
+  </dialog>
+  <div id="toast" class="toast" role="status" hidden></div><select id="stackMode" hidden aria-hidden="true"><option value="mapping">mapping</option><option value="nav_slam">nav_slam</option><option value="nav_map">nav_map</option></select><select id="savedMap" hidden aria-hidden="true"><option value=""></option></select>
+  <script src="/ui.js?v=3"></script><script src="/navigation.js?v=3"></script><script src="/app.js?v=3"></script>
 </body>
 </html>

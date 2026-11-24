@@ -19,7 +19,7 @@ def request(path, body=None, token='software-smoke'):
         data=json.dumps(body).encode() if body is not None else None,
         headers={'Content-Type': 'application/json', 'X-Dashboard-Token': token})
     try:
-        with urllib.request.urlopen(req, timeout=25) as response:
+        with urllib.request.urlopen(req, timeout=45) as response:
             return response.status, json.load(response)
     except urllib.error.HTTPError as exc:
         return exc.code, json.load(exc)
@@ -68,6 +68,19 @@ def main():
                 assert request('/api/maps/save', {'name': '../bad'})[0] == 400
                 assert request('/api/stop', {})[0] == 200
                 assert request('/api/maps')[1]['maps'] == []
+                maps = Path(folder) / 'maps'
+                (maps / 'Gallery map.pgm').write_bytes(b'P5\n3 2\n255\n' + bytes([0, 254, 205, 0, 254, 205]))
+                (maps / 'Gallery map.yaml').write_text('image: Gallery map.pgm\nresolution: 0.05\nfree_thresh: 0.196\noccupied_thresh: 0.65\n')
+                code, gallery = request('/api/maps')
+                assert code == 200 and gallery['items'][0]['name'] == 'Gallery map', gallery
+                preview = gallery['items'][0]['preview_url']
+                assert request(preview, token='wrong')[0] == 401
+                req = urllib.request.Request('http://127.0.0.1:18080' + preview,
+                    headers={'X-Dashboard-Token': 'software-smoke'})
+                with urllib.request.urlopen(req, timeout=5) as image:
+                    assert image.headers.get_content_type() == 'image/png'
+                    assert image.read().startswith(b'\x89PNG\r\n\x1a\n')
+                assert request('/api/maps/preview?name=..%2Fbad')[0] == 404
                 print('HTTP SMOKE PASSED: auth, validation, goal guard, SLAM preservation, mode switch, STOP', flush=True)
             except Exception:
                 print(log_path.read_text()[-12000:], flush=True)

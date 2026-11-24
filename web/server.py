@@ -8,7 +8,7 @@ import shlex
 import signal
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 WEB_DIR = Path(__file__).resolve().parent
 STATIC_DIR = WEB_DIR / 'static'
@@ -68,7 +68,19 @@ class Handler(BaseHTTPRequestHandler):
             elif path == '/api/status':
                 self.send_json(200, status())
             elif path == '/api/maps':
-                self.send_json(200, {'ok': True, 'maps': SUPERVISOR.maps()})
+                self.send_json(200, {'ok': True, 'maps': SUPERVISOR.maps(), 'items': SUPERVISOR.map_items()})
+            elif path == '/api/maps/preview':
+                try:
+                    name = parse_qs(urlparse(self.path).query).get('name', [''])[0]
+                    data = SUPERVISOR.map_preview(name)
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'image/png')
+                    self.send_header('Content-Length', str(len(data)))
+                    self.send_header('Cache-Control', 'private, max-age=300')
+                    self.end_headers()
+                    self.wfile.write(data)
+                except (ValueError, KeyError, TypeError, OSError) as exc:
+                    self.send_json(404, {'ok': False, 'error': str(exc)})
             else:
                 self.send_json(404, {'ok': False, 'error': 'unknown endpoint'})
             return

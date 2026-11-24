@@ -1,0 +1,17 @@
+{
+  "copyright": "Sanrio Co., Ltd.",
+  "assets": [
+    {
+      "file": "sanrio-hello-kitty.png",
+      "source": "https://corporate.sanrio.co.jp/en/business-info/images/img_hello-kitty.png",
+      "page": "https://corporate.sanrio.co.jp/en/business-info/brands/hello_kity/index.html",
+      "modified": false
+    },
+    {
+      "file": "sanrio-cinnamoroll.png",
+      "source": "https://www.sanrio.co.jp/wp-content/uploads/2022/06/mv-cinnamon.png",
+      "page": "https://www.sanrio.co.jp/characters/cinnamon/",
+      "modified": false
+    }
+  ]
+}

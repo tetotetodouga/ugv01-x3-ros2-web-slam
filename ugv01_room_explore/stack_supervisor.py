@@ -2,18 +2,13 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
-import re
 import signal
 import subprocess
 import sys
 import threading
 import time
 
-
-def map_name(value):
-    if not isinstance(value, str) or not re.fullmatch(r'[\w-]{1,64}', value, re.UNICODE):
-        raise ValueError('Имя карты: 1–64 буквы, цифры, дефис или подчёркивание')
-    return value
+from ugv01_room_explore.map_gallery import list_map_cards, map_name, map_preview
 
 
 def stop_process(process):
@@ -72,6 +67,12 @@ class StackSupervisor:
     def maps(self):
         return sorted(p.stem for p in self.maps_dir.glob('*.yaml') if p.is_file())
 
+    def map_items(self):
+        return list_map_cards(self.maps_dir)
+
+    def map_preview(self, name):
+        return map_preview(self.maps_dir, name)
+
     def switch(self, mode, selected_map=None):
         if not self.managed:
             raise ValueError('Для Nav2 запустите web_navigation.launch.py вместо web_mapping.launch.py')
@@ -92,7 +93,8 @@ class StackSupervisor:
                 stop_process(self.slam_process)
                 self.slam_process = None
             self.bridge.invoke('stack', mode='transition', preserve_map=keep_slam)
-            deadline = time.monotonic() + 4.0
+            # DDS may retain endpoints briefly after a node exits during startup.
+            deadline = time.monotonic() + 25.0
             while True:
                 conflicts = self.bridge.invoke('nodes', allowed=['slam_toolbox'] if keep_slam else [])['conflicts']
                 if not conflicts or time.monotonic() >= deadline:
