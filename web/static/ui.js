@@ -22,6 +22,7 @@ function closeDialogs() {
 }
 
 function openDialog(id) {
+  if (id === 'mapsDialog') { setControlView('maps'); return; }
   stopRobot();
   closeDialogs();
   dialogReturnFocus = document.activeElement;
@@ -32,15 +33,25 @@ function openDialog(id) {
 }
 
 function setDrivePanel(open) {
-  if (!open) stopRobot();
-  $('drivePanel').hidden = !open;
-  $('toggleDrive').classList.toggle('active', open);
-  $('toggleDrive').setAttribute('aria-expanded', String(open));
+  setControlView(open ? 'manual' : 'nav');
+}
+
+function setControlView(view) {
+  const cockpit = document.querySelector('.cockpit');
+  if (cockpit.dataset.view === 'manual' && view !== 'manual') stopRobot();
+  cockpit.dataset.view = view;
+  document.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== view; });
+  Object.entries({ nav: 'viewNav', manual: 'toggleDrive', maps: 'viewMaps' }).forEach(([name, id]) => {
+    $(id).classList.toggle('active', name === view);
+    $(id).setAttribute('aria-selected', String(name === view));
+  });
+  requestAnimationFrame(resizeCanvas);
 }
 
 function applyTheme(theme, announce = true) {
   theme = theme === 'kawaii' ? 'kawaii' : 'dark';
   document.documentElement.dataset.theme = theme;
+  $('brandTitle').textContent = theme === 'kawaii' ? 'Hello Kitty' : 'UGV01';
   try { localStorage.setItem('x3-theme', theme); } catch (_) {}
   $('themeSettings').hidden = theme !== 'kawaii';
   $('sanrioCredit').hidden = theme !== 'kawaii';
@@ -62,9 +73,12 @@ function displayMapName(name) {
 
 function updateDashboard(data) {
   activeMapName = data.map || '';
-  $('currentMapName').textContent = activeMapName ? displayMapName(activeMapName) : 'Новая карта';
+  $('currentMapName').textContent = activeMapName ? displayMapName(activeMapName) : 'Живая карта';
   $('currentMapName').title = activeMapName;
   $('mapModeLabel').textContent = navigation.stack_mode === 'nav_map' ? 'Готовая карта' : 'Живая карта';
+  if (!requestBusy) $('mainStackMode').value = navigation.stack_mode || 'mapping';
+  $('localizationSettings').hidden = navigation.stack_mode !== 'nav_map';
+  $('driveModeLabel').textContent = { JOY: 'Ручной режим', AUTO: 'Автообход', NAV: 'Навигация' }[mode] || mode;
   const canSave = !!mapMsg && ['mapping', 'nav_slam'].includes(navigation.stack_mode);
   $('openSave').disabled = $('saveFromMaps').disabled = !canSave || requestBusy;
   $('openSave').title = canSave ? 'Сохранить карту' : 'Сохранение доступно при построении карты';
@@ -150,11 +164,11 @@ function showSaveDialog() {
 
 async function switchStackMode(nextMode, name = '') {
   if (requestBusy) return;
-  if (nextMode === navigation.stack_mode && (nextMode !== 'nav_map' || name === activeMapName)) { closeDialogs(); return; }
-  if (nextMode === 'nav_map' && !name) { openDialog('mapsDialog'); await reloadMaps(); return; }
+  if (nextMode === navigation.stack_mode && (nextMode !== 'nav_map' || name === activeMapName)) { closeDialogs(); setControlView('nav'); return; }
+  if (nextMode === 'nav_map' && !name) { setControlView('maps'); notifyUser('Выберите сохранённую карту'); await reloadMaps(); return; }
   requestBusy = true;
   $('mapsMessage').textContent = 'Открываем карту…';
-  $('applyStack').disabled = true;
+  $('mainStackMode').disabled = true;
   $('navStatus').textContent = 'Переключение режима…';
   updateSelectionStatus();
   stopRobot();
@@ -163,8 +177,10 @@ async function switchStackMode(nextMode, name = '') {
     if (data.ok) {
       $('stackMode').value = nextMode;
       if (name) $('savedMap').value = name;
-      selection = null; plannedPath = []; fitMapView();
+      selection = null; plannedPath = [];
       closeDialogs();
+      setControlView('nav');
+      requestAnimationFrame(fitMapView);
       notifyUser(nextMode === 'nav_map' ? `Открыта карта «${displayMapName(name)}»` : 'Режим включён');
     } else {
       $('mapsMessage').textContent = data.error;
@@ -173,7 +189,8 @@ async function switchStackMode(nextMode, name = '') {
     await refreshServerStatus();
   } finally {
     requestBusy = false;
-    $('applyStack').disabled = false;
+    $('mainStackMode').disabled = false;
+    $('mainStackMode').value = navigation.stack_mode || 'mapping';
     updateSelectionStatus();
   }
 }
@@ -195,25 +212,18 @@ function initDashboard() {
     });
   });
   document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', closeDialogs));
-  $('openMaps').addEventListener('click', async () => { $('mapsMessage').textContent = ''; openDialog('mapsDialog'); await reloadMaps(); });
-  $('openSettings').addEventListener('click', () => {
-    const radio = document.querySelector(`input[name="stackChoice"][value="${navigation.stack_mode}"]`);
-    if (radio) radio.checked = true;
-    openDialog('settingsDialog');
-  });
+  const showMaps = async () => { $('mapsMessage').textContent = ''; setControlView('maps'); await reloadMaps(); };
+  $('openMaps').addEventListener('click', showMaps);
+  $('viewMaps').addEventListener('click', showMaps);
+  $('viewNav').addEventListener('click', () => setControlView('nav'));
+  $('openSettings').addEventListener('click', () => openDialog('settingsDialog'));
+  $('mobileSettings').addEventListener('click', () => openDialog('settingsDialog'));
   $('openSave').addEventListener('click', showSaveDialog);
   $('saveFromMaps').addEventListener('click', showSaveDialog);
   $('mapSearch').addEventListener('input', renderGallery);
-  $('newMap').textContent = 'Живая карта';
   $('newMap').addEventListener('click', () => switchStackMode('nav_slam'));
-  $('toggleDrive').addEventListener('click', () => setDrivePanel($('drivePanel').hidden));
-  $('closeDrive').addEventListener('click', () => setDrivePanel(false));
-  $('toggleLayers').addEventListener('click', () => {
-    const open = $('layersPopover').hidden;
-    $('layersPopover').hidden = !open;
-    $('toggleLayers').classList.toggle('active', open);
-    $('toggleLayers').setAttribute('aria-expanded', String(open));
-  });
+  $('toggleDrive').addEventListener('click', () => setControlView('manual'));
+  $('mainStackMode').addEventListener('change', () => switchStackMode($('mainStackMode').value, $('mainStackMode').value === 'nav_map' ? activeMapName : ''));
   $('dismissMapHint').addEventListener('click', () => { $('mapHint').hidden = true; });
   $('showPath').addEventListener('change', drawMap);
   $('themeSecret').addEventListener('click', toggleTheme);
@@ -225,4 +235,5 @@ function initDashboard() {
     secretTimer = setTimeout(() => { secretClicks = 0; }, 1600);
   });
   applyTheme(document.documentElement.dataset.theme, false);
+  setControlView('nav');
 }

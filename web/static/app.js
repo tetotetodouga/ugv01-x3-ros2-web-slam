@@ -104,6 +104,7 @@ const $ = (id) => document.getElementById(id);
           if (data.topic === '/cmd_vel') {
             driveCmdAt = Date.now();
             $("cmdStat").textContent = `${data.msg.linear.x.toFixed(2)} / ${data.msg.angular.z.toFixed(2)}`;
+            $("speedStat").textContent = Math.abs(data.msg.linear.x).toFixed(2).replace('.', ',');
           }
           if (data.topic === '/global_costmap/costmap') {
             costmapMsg = data.msg.header.frame_id === 'map' ? data.msg : null;
@@ -233,7 +234,10 @@ const $ = (id) => document.getElementById(id);
     function updateMapPalette() {
       const style = getComputedStyle(document.documentElement);
       const get = name => style.getPropertyValue('--' + name).trim();
-      const rgb = value => [1, 3, 5].map(offset => parseInt(value.slice(offset, offset + 2), 16));
+      const rgb = value => {
+        const hex = value.length === 4 ? '#' + [...value.slice(1)].map(char => char + char).join('') : value;
+        return [1, 3, 5].map(offset => parseInt(hex.slice(offset, offset + 2), 16));
+      };
       mapPalette = { bg: get('map-bg'), grid: get('map-grid'), path: get('path'),
         robot: get('robot'), outline: get('robot-outline'), goal: get('goal'),
         selection: get('selection'), pose: get('pose'),
@@ -385,6 +389,7 @@ const $ = (id) => document.getElementById(id);
 
     $("joyZone").addEventListener("pointerup", releaseJoy);
     $("joyZone").addEventListener("pointercancel", releaseJoy);
+    $("joyZone").addEventListener("lostpointercapture", releaseJoy);
     window.addEventListener("blur", stopRobot);
 
     function setKeyVisual() {

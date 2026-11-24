@@ -12,6 +12,24 @@
       "source": "https://www.sanrio.co.jp/wp-content/uploads/2022/06/mv-cinnamon.png",
       "page": "https://www.sanrio.co.jp/characters/cinnamon/",
       "modified": false
+    },
+    {
+      "file": "sanrio-mymelody.png",
+      "source": "https://www.sanrio.co.jp/wp-content/uploads/2022/06/list-mymelody.png",
+      "page": "https://www.sanrio.co.jp/characters/mymelody/",
+      "modified": false
+    },
+    {
+      "file": "sanrio-kuromi.png",
+      "source": "https://www.sanrio.co.jp/wp-content/uploads/2022/06/list-kuromi.png",
+      "page": "https://www.sanrio.co.jp/characters/kuromi/",
+      "modified": false
+    },
+    {
+      "file": "sanrio-pompompurin.png",
+      "source": "https://www.sanrio.co.jp/wp-content/uploads/2022/06/list-pompompurin.png",
+      "page": "https://www.sanrio.co.jp/characters/pompompurin/",
+      "modified": false
     }
   ]
 }

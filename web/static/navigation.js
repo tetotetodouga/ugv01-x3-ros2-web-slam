@@ -53,7 +53,7 @@ async function refreshServerStatus() {
     mode = data.mode || 'JOY';
     renderDriveMode();
     updateDashboard(data);
-    if (Date.now() - driveCmdAt > 1500) $('cmdStat').textContent = '— / —';
+    if (Date.now() - driveCmdAt > 1500) { $('cmdStat').textContent = '— / —'; $('speedStat').textContent = '—'; }
     const sourceChanged = lastStackMode !== navigation.stack_mode;
     if (sourceChanged) {
       if (lastStackMode !== null) {
@@ -80,7 +80,8 @@ async function refreshServerStatus() {
       succeeded: 'Цель достигнута', canceled: 'Робот остановлен', failed: 'Не удалось доехать', rejected: 'Цель недоступна' };
     let message = navigation.ready ? (stateNames[navigation.goal_state] || 'Готов к поездке') :
       navigation.stack_mode === 'mapping' ? 'Строим карту · управление вручную' : navigation.reason;
-    if (navigation.distance_remaining != null) message += ` · ${navigation.distance_remaining.toFixed(2)} м`;
+    if (['pending', 'navigating'].includes(navigation.goal_state) && navigation.distance_remaining != null)
+      message += ` · ${navigation.distance_remaining.toFixed(2).replace('.', ',')} м`;
     if (navigation.error || data.error) message += ` · ${navigation.error || data.error}`;
     $('navStatus').textContent = message || 'SLAM';
     $('navStatus').classList.toggle('ready', !!navigation.ready);
@@ -134,9 +135,9 @@ function updateSelectionStatus() {
   const navigating = ['pending', 'navigating'].includes(navigation.goal_state);
   const distance = selection && robotPose ? Math.hypot(selection.x - robotPose.x, selection.y - robotPose.y) : navigation.distance_remaining;
   $('selectionStatus').textContent = selection ? (selection.tool === 'pose' ? 'Положение выбрано' : 'Цель выбрана') :
-    navigating ? 'Робот едет к цели' : navigation.goal_state === 'succeeded' ? 'Цель достигнута' : mapTool === 'goal' ? 'Выберите точку на карте' : 'Куда поедем?';
+    navigating ? 'Робот едет к цели' : navigation.goal_state === 'succeeded' ? 'Цель достигнута' : mapTool === 'goal' ? 'Выберите точку на карте' : 'Цель не выбрана';
   $('goalDetail').textContent = distance != null && (selection || navigating) ? `${distance.toFixed(1).replace('.', ',')} м${navigating ? ' до цели' : ' от робота'}` :
-    selection ? 'Проверьте точку и подтвердите' : mapTool === 'goal' ? 'Потяните, чтобы задать направление' : 'Нажмите «Цель» или откройте управление';
+    selection ? 'Проверьте точку и подтвердите' : mapTool === 'goal' ? 'Потяните, чтобы задать направление' : 'Нажмите «Выбрать цель», затем укажите точку на карте.';
   $('goLabel').textContent = selection?.tool === 'pose' ? 'Установить' : 'Поехать';
   const enableNavigation = !selection && navigation.stack_mode === 'mapping';
   const locateRobot = !selection && navigation.stack_mode === 'nav_map' && !navigation.ready &&
@@ -169,10 +170,6 @@ function initNavigation() {
     const result = await apiPost('/api/mode/' + name);
     if (result.ok) { mode = name.toUpperCase(); renderDriveMode(); }
   });
-  $('applyStack').addEventListener('click', () => {
-    const chosen = document.querySelector('input[name="stackChoice"]:checked').value;
-    switchStackMode(chosen, chosen === 'nav_map' ? activeMapName : '');
-  });
   $('saveForm').addEventListener('submit', async event => {
     event.preventDefault();
     const name = $('mapName').value.trim();
@@ -194,7 +191,7 @@ function initNavigation() {
   $('reloadMaps').addEventListener('click', reloadMaps);
   $('showCostmap').addEventListener('change', drawMap);
   $('toolPan').addEventListener('click', () => setMapTool('pan'));
-  $('toolGoal').addEventListener('click', () => setMapTool('goal'));
+  $('toolGoal').addEventListener('click', () => { setControlView('nav'); setMapTool('goal'); });
   $('toolPose').addEventListener('click', () => { closeDialogs(); setMapTool('pose'); });
   $('clearSelection').addEventListener('click', () => { selection = null; updateSelectionStatus(); drawMap(); });
   $('cancelGoal').addEventListener('click', async () => {
@@ -226,9 +223,8 @@ function initNavigation() {
 function mapGeometry() {
   if (!mapMsg) return null;
   const info = mapMsg.info;
-  const dpr = window.devicePixelRatio || 1, mobile = window.innerWidth <= 680;
-  const left = (mobile ? 15 : 38) * dpr, right = (mobile ? 64 : 95) * dpr;
-  const top = 55 * dpr, bottom = (mobile ? 235 : 145) * dpr;
+  const padding = (window.innerWidth <= 680 ? 14 : 24) * (window.devicePixelRatio || 1);
+  const left = padding, right = padding, top = padding, bottom = padding;
   const width = Math.max(1, canvas.width - left - right), height = Math.max(1, canvas.height - top - bottom);
   const scale = Math.min(width / info.width, height / info.height) * mapView.zoom;
   return { info, scale, ox: left + (width - info.width * scale) / 2 + mapView.panX,

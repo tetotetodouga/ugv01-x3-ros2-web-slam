@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ru" data-theme="dark">
 <head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
   <meta name="theme-color" content="#171c21" /><title>X3 · Пульт управления</title>
-  <link rel="stylesheet" href="/dashboard.css?v=3" />
+  <link rel="stylesheet" href="/dashboard.css?v=4" />
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('x3-theme')||'dark'}catch(e){}</script>
 </head>
 <body>
@@ -25,70 +25,66 @@
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20 5c-3-3-7-1-8 1-1-2-5-4-8-1-5 5 3 11 8 15 5-4 13-10 8-15Z"/></symbol>
   </defs></svg>
-  <main class="cockpit">
+  <main class="cockpit" data-view="nav">
     <header class="topbar">
-      <button class="brand" id="brandSecret" title="X3" aria-label="X3"><span class="brand-mark">X3</span><span class="brand-name">Пульт управления</span></button>
+      <button class="brand" id="brandSecret" title="X3" aria-label="X3"><img class="brand-character" src="/sanrio-hello-kitty.png" alt="" /><span class="brand-mark">X3</span><span id="brandTitle" class="brand-title">UGV01</span></button>
       <span class="connection"><span id="connDot" class="dot warn"></span><span id="connText">Подключение</span></span>
-      <span class="top-divider"></span>
-      <button id="openMaps" class="map-switch"><svg><use href="#i-map"/></svg><span id="currentMapName">Новая карта</span><svg class="chevron"><use href="#i-down"/></svg></button>
+      <span class="header-map-name" id="currentMapName">Живая карта</span>
       <div class="top-spacer"></div>
-      <button id="openSave" class="icon-button save-shortcut" title="Сохранить карту" aria-label="Сохранить карту"><svg><use href="#i-save"/></svg></button>
-      <button id="openSettings" class="icon-button" title="Настройки" aria-label="Настройки"><svg><use href="#i-gear"/></svg></button>
-      <button id="quickStop" class="stop-button"><span class="stop-square"></span>STOP</button>
+      <button id="openMaps" class="header-action"><svg><use href="#i-map"/></svg><span>Карты</span></button>
+      <button id="openSave" class="header-action"><svg><use href="#i-save"/></svg><span>Сохранить</span></button>
+      <button id="openSettings" class="header-action"><svg><use href="#i-gear"/></svg><span>Сервис</span></button>
+      <img class="header-cinnamon" src="/sanrio-cinnamoroll.png" alt="" />
+      <button id="mobileSettings" class="mobile-service icon-button" aria-label="Сервис" title="Сервис"><svg><use href="#i-gear"/></svg></button>
+      <button id="quickStop" type="button" class="stop-button"><span class="stop-square"></span>STOP</button>
     </header>
-    <section class="workspace" aria-label="Карта и управление">
-      <canvas id="mapCanvas" aria-label="Карта робота. Выберите цель или перемещайте карту"></canvas>
-      <div class="map-empty" id="mapEmpty"><svg><use href="#i-map"/></svg><h1>Здесь появится карта</h1><p id="emptyMapText">Подключаемся к роботу…</p></div>
-      <div class="map-label"><span class="live-point"></span><span id="mapModeLabel">Живая карта</span><span class="map-label-divider"></span><span id="mapInfo">Ожидание карты</span></div>
-      <div class="map-toolbar" aria-label="Инструменты карты">
-        <button id="toggleLayers" class="icon-button" title="Слои карты" aria-label="Слои карты" aria-expanded="false"><svg><use href="#i-layers"/></svg></button><span class="toolbar-rule"></span>
-        <button id="zoomIn" class="icon-button" title="Приблизить" aria-label="Приблизить"><svg><use href="#i-plus"/></svg></button>
-        <button id="zoomOut" class="icon-button" title="Отдалить" aria-label="Отдалить"><svg><use href="#i-minus"/></svg></button>
-        <button id="zoomFit" class="icon-button" title="Показать всю карту" aria-label="Показать всю карту"><svg><use href="#i-fit"/></svg></button>
-      </div>
-      <section id="layersPopover" class="layers-popover floating" hidden><strong>На карте</strong><label class="switch-row">Зоны препятствий<input id="showCostmap" type="checkbox" checked /></label><label class="switch-row">Маршрут<input id="showPath" type="checkbox" checked /></label></section>
-      <div id="mapHint" class="map-hint" hidden><svg><use href="#i-target"/></svg><span id="mapHintText">Нажмите на карту и потяните, чтобы задать направление</span><button id="dismissMapHint" class="icon-button" aria-label="Закрыть подсказку"><svg><use href="#i-close"/></svg></button></div>
-      <section id="drivePanel" class="drive-panel floating" hidden aria-label="Ручное управление">
-        <div class="drive-panel-head"><span>Управление</span><button id="closeDrive" class="icon-button" aria-label="Скрыть управление"><svg><use href="#i-close"/></svg></button></div>
-        <div class="drive-modes"><button id="joyBtn" class="active">Вручную</button><button id="autoBtn">Автообход</button></div>
-        <div id="joyZone" class="joy-zone" role="application" aria-label="Джойстик. Удерживайте для движения"><div class="joy-ring outer"></div><div class="joy-ring inner"></div><div class="joy-cross-v"></div><div class="joy-cross-h"></div><span class="joy-direction up">⌃</span><span class="joy-direction down">⌄</span><span class="joy-direction left">‹</span><span class="joy-direction right">›</span><div id="joyVector" class="joy-vector"></div><div id="joyKnob" class="joy-knob"></div></div>
-        <div class="wasd" aria-label="Клавиши управления"><span id="keyW" class="key">W</span><span id="keyA" class="key">A</span><span id="keyS" class="key">S</span><span id="keyD" class="key">D</span><span class="key-caption">или стрелки</span></div>
-        <p id="driveHint" class="drive-hint">Отпустите джойстик, чтобы остановиться</p>
+
+    <section class="workspace">
+      <section class="map-pane" aria-label="Карта робота">
+        <div class="map-toolbar">
+          <div class="map-tools"><button id="toolGoal" disabled><svg><use href="#i-target"/></svg><span>Выбрать цель</span></button><button id="toolPan" class="active"><svg><use href="#i-pan"/></svg><span>Двигать карту</span></button></div>
+          <div class="map-layers"><label><input id="showCostmap" type="checkbox" checked />Препятствия</label><label><input id="showPath" type="checkbox" checked />Маршрут</label></div>
+        </div>
+        <div class="map-stage">
+          <canvas id="mapCanvas" aria-label="Карта робота. Выберите цель или перемещайте карту"></canvas>
+          <div class="map-empty" id="mapEmpty"><svg><use href="#i-map"/></svg><h1>Ожидание карты</h1><p id="emptyMapText">Подключаемся к роботу…</p></div>
+          <div id="mapHint" class="map-hint" hidden><span id="mapHintText">Укажите точку и потяните в нужном направлении</span><button id="dismissMapHint" class="icon-button" aria-label="Закрыть подсказку"><svg><use href="#i-close"/></svg></button></div>
+          <div class="map-zoom"><button id="zoomIn" aria-label="Приблизить"><svg><use href="#i-plus"/></svg></button><button id="zoomOut" aria-label="Отдалить"><svg><use href="#i-minus"/></svg></button><button id="zoomFit"><svg><use href="#i-fit"/></svg><span>Вся карта</span></button></div>
+        </div>
+        <footer class="map-status"><span class="status-message"><span id="navDot" class="dot warn"></span><span id="navStatus" role="status">Подключение к роботу</span></span><span class="status-friends" aria-hidden="true"><img src="/sanrio-kuromi.png" alt="" /><img src="/sanrio-pompompurin.png" alt="" /></span><span class="map-meta"><span id="mapModeLabel">Живая карта</span><span id="mapInfo"></span></span></footer>
       </section>
-      <div class="status-float"><span id="navDot" class="dot warn"></span><span id="navStatus" role="status">Подключение к роботу</span></div>
-      <section class="command-dock floating" aria-label="Навигация">
-        <div class="dock-tools"><button id="toolGoal" class="dock-tool" disabled title="Выбрать цель"><svg><use href="#i-target"/></svg><span>Цель</span></button><button id="toggleDrive" class="dock-tool" aria-expanded="false"><svg><use href="#i-game"/></svg><span>Управление</span></button><button id="toolPan" class="dock-tool active" title="Перемещать карту"><svg><use href="#i-pan"/></svg><span>Обзор</span></button></div>
-        <span class="dock-divider"></span><div class="goal-summary"><strong id="selectionStatus">Выберите цель на карте</strong><span id="goalDetail">Робот готов к работе</span></div>
-        <button id="clearSelection" class="icon-button clear-selection" title="Сбросить точку" aria-label="Сбросить точку" hidden><svg><use href="#i-close"/></svg></button><button id="cancelGoal" class="secondary cancel-goal" hidden>Отменить</button>
-        <button id="sendSelection" class="primary go-button" disabled><svg><use href="#i-play"/></svg><span id="goLabel">Поехать</span></button>
-      </section>
-      <div class="kawaii-decoration kitty" aria-hidden="true"><img src="/sanrio-hello-kitty.png" alt="" /></div><div class="kawaii-decoration cinnamon" aria-hidden="true"><img src="/sanrio-cinnamoroll.png" alt="" /></div>
-      <button id="themeSecret" class="theme-secret" title="Hello Kitty" aria-label="Секретная тема Hello Kitty"><svg><use href="#i-heart"/></svg></button>
+
+      <aside class="control-panel" aria-label="Управление роботом">
+        <nav class="view-tabs" aria-label="Разделы пульта"><button id="viewNav" class="active" aria-selected="true"><svg><use href="#i-target"/></svg><img class="tab-character" src="/sanrio-hello-kitty.png" alt="" /><span>Nav2</span></button><button id="toggleDrive" aria-selected="false"><svg><use href="#i-game"/></svg><img class="tab-character" src="/sanrio-cinnamoroll.png" alt="" /><span>Вручную</span></button><button id="viewMaps" aria-selected="false"><svg><use href="#i-map"/></svg><img class="tab-character" src="/sanrio-mymelody.png" alt="" /><span>Карты</span></button></nav>
+
+        <section class="control-view nav-view" data-panel="nav">
+          <h1>Nav2</h1>
+          <label class="field-label" for="mainStackMode">Режим карты</label>
+          <select id="mainStackMode" class="text-field"><option value="nav_slam">Nav2 + SLAM</option><option value="nav_map">Nav2 по карте</option><option value="mapping">SLAM · построение карты</option></select>
+          <div class="goal-summary"><strong id="selectionStatus">Цель не выбрана</strong><p id="goalDetail">Нажмите «Выбрать цель», затем укажите точку на карте.</p></div>
+          <button id="sendSelection" class="primary go-button" disabled><svg><use href="#i-play"/></svg><span id="goLabel">Поехать</span></button>
+          <div class="goal-actions"><button id="clearSelection" class="secondary" hidden>Сбросить точку</button><button id="cancelGoal" class="secondary" hidden>Отменить маршрут</button></div>
+          <section id="localizationSettings" class="localization-section" hidden><h2>Положение робота</h2><button id="toolPose" class="secondary" disabled><svg><use href="#i-target"/></svg>Указать на карте</button><button id="globalPose" class="secondary" disabled><svg><use href="#i-locate"/></svg>Найти автоматически</button></section>
+          <div class="motion-readout"><span id="driveModeLabel">Ручной режим</span><span><b id="speedStat">0,00</b> м/с</span></div>
+          <div class="sanrio-panel-art friends-strip" aria-hidden="true"><span class="paper-heart">♡</span><img src="/sanrio-hello-kitty.png" alt="" /><img src="/sanrio-mymelody.png" alt="" /><img src="/sanrio-kuromi.png" alt="" /><span class="paper-heart">✧</span></div>
+        </section>
+
+        <section id="drivePanel" class="control-view drive-panel" data-panel="manual" hidden aria-label="Ручное управление">
+          <h1>Управление</h1><div class="drive-modes"><button id="joyBtn" class="active">Вручную</button><button id="autoBtn">Автообход</button></div>
+          <div id="joyZone" class="joy-zone" role="application" aria-label="Джойстик. Удерживайте для движения"><div class="joy-ring outer"></div><div class="joy-ring inner"></div><div class="joy-cross-v"></div><div class="joy-cross-h"></div><span class="joy-direction up">⌃</span><span class="joy-direction down">⌄</span><span class="joy-direction left">‹</span><span class="joy-direction right">›</span><div id="joyVector" class="joy-vector"></div><div id="joyKnob" class="joy-knob"></div></div>
+          <p id="driveHint" class="drive-hint">Удерживайте джойстик. Отпустите — робот остановится.</p><div class="wasd"><span id="keyW" class="key">W</span><span id="keyA" class="key">A</span><span id="keyS" class="key">S</span><span id="keyD" class="key">D</span><span class="key-caption">или стрелки</span></div>
+          <div class="sanrio-panel-art" aria-hidden="true"><img src="/sanrio-cinnamoroll.png" alt="" /><img src="/sanrio-pompompurin.png" alt="" /></div>
+        </section>
+
+        <section id="mapsDialog" class="control-view maps-view" data-panel="maps" hidden aria-label="Сохранённые карты"><div class="section-title"><h1>Карты</h1><button id="reloadMaps" class="text-button">Обновить</button></div><button id="saveFromMaps" class="primary"><svg><use href="#i-save"/></svg>Сохранить текущую</button><button id="newMap" class="secondary"><svg><use href="#i-map"/></svg>Вернуться к живой карте</button><div class="gallery-search"><svg><use href="#i-search"/></svg><input id="mapSearch" type="search" placeholder="Название карты" aria-label="Найти карту" /></div><p id="mapsMessage" class="inline-message" role="status"></p><div id="mapGallery" class="map-gallery" role="group" aria-label="Сохранённые карты"></div><p id="mapsCount" class="maps-count"></p></section>
+        <button id="themeSecret" class="theme-secret" title="Hello Kitty" aria-label="Секретная тема Hello Kitty"><svg><use href="#i-heart"/></svg></button>
+      </aside>
     </section>
   </main>
-  <dialog id="mapsDialog" class="maps-dialog">
-    <div class="dialog-heading"><div><span class="eyebrow">ВАШЕ ПРОСТРАНСТВО</span><h2>Карты</h2></div><button class="icon-button" data-close-dialog aria-label="Закрыть карты"><svg><use href="#i-close"/></svg></button></div>
-    <div class="map-actions"><button id="newMap" class="secondary"><svg><use href="#i-plus"/></svg>Новая карта</button><button id="saveFromMaps" class="primary"><svg><use href="#i-save"/></svg>Сохранить текущую</button></div>
-    <div class="gallery-search"><svg><use href="#i-search"/></svg><input id="mapSearch" type="search" placeholder="Найти карту" aria-label="Найти карту" /></div><div id="mapGallery" class="map-gallery" role="group" aria-label="Сохранённые карты"></div><p id="mapsMessage" class="inline-message" role="status"></p>
-    <div class="dialog-footer"><span id="mapsCount">Загрузка…</span><button id="reloadMaps" class="text-button">Обновить</button></div>
-  </dialog>
-  <dialog id="saveDialog" class="save-dialog"><form id="saveForm">
-    <div class="dialog-heading"><div><span class="eyebrow">ОСТАНЕТСЯ НА РОБОТЕ</span><h2>Сохранить карту</h2></div><button type="button" class="icon-button" data-close-dialog aria-label="Закрыть сохранение"><svg><use href="#i-close"/></svg></button></div>
-    <div class="save-preview"><canvas id="savePreview" aria-label="Превью сохраняемой карты"></canvas><span>Текущая карта</span></div><label class="field-label" for="mapName">Название</label><input id="mapName" class="text-field" placeholder="Например, Первый этаж" maxlength="64" autocomplete="off" required /><p id="saveMessage" class="inline-message" role="status"></p>
-    <div class="dialog-actions"><button type="button" class="secondary" data-close-dialog>Отмена</button><button id="saveMap" class="primary" type="submit"><svg><use href="#i-save"/></svg><span>Сохранить карту</span></button></div>
-  </form></dialog>
-  <dialog id="settingsDialog" class="settings-dialog">
-    <div class="dialog-heading"><div><span class="eyebrow">X3</span><h2>Настройки</h2></div><button class="icon-button" data-close-dialog aria-label="Закрыть настройки"><svg><use href="#i-close"/></svg></button></div>
-    <section class="settings-section"><h3>Режим работы</h3><div class="stack-options" id="stackOptions">
-      <label><input type="radio" name="stackChoice" value="nav_slam" checked /><span><strong>Навигация и новая карта</strong><small>Ехать к цели и строить карту по пути</small></span></label>
-      <label><input type="radio" name="stackChoice" value="nav_map" /><span><strong>Навигация по готовой карте</strong><small>Выберите сохранённую карту в галерее</small></span></label>
-      <label><input type="radio" name="stackChoice" value="mapping" /><span><strong>Только построение карты</strong><small>Ручное управление и автообход</small></span></label>
-    </div><button id="applyStack" class="secondary full-width">Применить режим</button></section>
-    <section class="settings-section" id="localizationSettings"><h3>Положение на карте</h3><div class="button-row"><button id="toolPose" class="secondary" disabled><svg><use href="#i-target"/></svg>Указать положение</button><button id="globalPose" class="secondary" disabled><svg><use href="#i-locate"/></svg>Найти робота</button></div><p class="field-help">Для сохранённой карты. После выбора положения задайте направление на карте.</p></section>
-    <details class="settings-section connection-details"><summary>Подключение и диагностика</summary><label class="field-label" for="wsUrl">Адрес WebSocket</label><input id="wsUrl" class="text-field" spellcheck="false" /><label class="field-label" for="dashboardToken">Токен доступа</label><input id="dashboardToken" class="text-field" type="password" placeholder="Если настроен" autocomplete="off" /><div class="telemetry"><div><span>Режим</span><strong id="modeStat">JOY</strong></div><div><span>Команда, м/с · рад/с</span><strong id="cmdStat">— / —</strong></div><div><span>Положение, м</span><strong id="poseStat">—</strong></div><div><span>Направление</span><strong id="yawStat">—</strong></div></div><div id="log" class="log" aria-label="Журнал событий"></div></details>
-    <div class="settings-footer"><span>UGV01-X3 · ROS 2</span><button id="themeSettings" class="text-button" hidden>Вернуть тёмную тему</button></div><div id="sanrioCredit" class="sanrio-credit" hidden>Персонажи © Sanrio · <a href="https://corporate.sanrio.co.jp/en/business-info/brands/hello_kity/index.html" target="_blank" rel="noreferrer">Hello Kitty</a> · <a href="https://www.sanrio.co.jp/characters/cinnamon/" target="_blank" rel="noreferrer">Cinnamoroll</a></div>
-  </dialog>
+
+  <dialog id="saveDialog" class="save-dialog"><form id="saveForm"><div class="dialog-heading"><h1>Сохранить карту</h1><img class="dialog-character" src="/sanrio-mymelody.png" alt="" /><button type="button" class="icon-button" data-close-dialog aria-label="Закрыть сохранение"><svg><use href="#i-close"/></svg></button></div><div class="save-preview"><canvas id="savePreview" aria-label="Превью сохраняемой карты"></canvas></div><label class="field-label" for="mapName">Название карты</label><input id="mapName" class="text-field" placeholder="Например, Первый этаж" maxlength="64" autocomplete="off" required /><p id="saveMessage" class="inline-message" role="status"></p><div class="dialog-actions"><button type="button" class="secondary" data-close-dialog>Отмена</button><button id="saveMap" class="primary" type="submit">Сохранить</button></div></form></dialog>
+  <dialog id="settingsDialog" class="settings-dialog"><div class="dialog-heading"><h1>Сервис</h1><img class="dialog-character" src="/sanrio-kuromi.png" alt="" /><button class="icon-button" data-close-dialog aria-label="Закрыть настройки"><svg><use href="#i-close"/></svg></button></div><p class="field-help">Подключение к роботу и технические данные</p><label class="field-label" for="wsUrl">Адрес WebSocket</label><input id="wsUrl" class="text-field" spellcheck="false" /><label class="field-label" for="dashboardToken">Токен доступа</label><input id="dashboardToken" class="text-field" type="password" placeholder="Если настроен" autocomplete="off" /><div class="telemetry"><div><span>Режим</span><strong id="modeStat">JOY</strong></div><div><span>Команда, м/с · рад/с</span><strong id="cmdStat">— / —</strong></div><div><span>Положение, м</span><strong id="poseStat">—</strong></div><div><span>Направление</span><strong id="yawStat">—</strong></div></div><details><summary>Журнал событий</summary><div id="log" class="log"></div></details><button id="themeSettings" class="secondary" hidden>Вернуть тёмную тему</button><div id="sanrioCredit" class="sanrio-credit" hidden>Персонажи © Sanrio · <a href="/sanrio-sources.json" target="_blank">Источники изображений</a> · <a href="https://corporate.sanrio.co.jp/en/business-info/brands/hello_kity/index.html" target="_blank" rel="noreferrer">Hello Kitty</a> · <a href="https://www.sanrio.co.jp/characters/cinnamon/" target="_blank" rel="noreferrer">Cinnamoroll</a></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div><select id="stackMode" hidden aria-hidden="true"><option value="mapping">mapping</option><option value="nav_slam">nav_slam</option><option value="nav_map">nav_map</option></select><select id="savedMap" hidden aria-hidden="true"><option value=""></option></select>
-  <script src="/ui.js?v=3"></script><script src="/navigation.js?v=3"></script><script src="/app.js?v=3"></script>
+  <script src="/ui.js?v=4"></script><script src="/navigation.js?v=4"></script><script src="/app.js?v=4"></script>
 </body>
 </html>
