@@ -19,7 +19,7 @@ if os.environ.get('ROS_DOMAIN_ID') != '91' or os.environ.get('ROS_LOCALHOST_ONLY
 import rclpy
 from geometry_msgs.msg import TransformStamped, Twist
 from nav2_msgs.action import ComputePathToPose
-from nav_msgs.msg import OccupancyGrid, Odometry
+from nav_msgs.msg import OccupancyGrid, Odometry, Path as NavPath
 from rclpy.action import ActionClient
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
@@ -38,17 +38,21 @@ class Sensors(Node):
         self.tf = TransformBroadcaster(self)
         self.grid = OccupancyGrid()
         self.grid.header.frame_id = 'map'
-        self.grid.info.width = self.grid.info.height = 60
-        self.grid.info.resolution = .1
+        # Match the real SLAM/costmap grid: Smac's segment smoothing is defined
+        # in grid points, so a coarser test map can skip smoothing short paths.
+        self.grid.info.width = self.grid.info.height = 120
+        self.grid.info.resolution = .05
         self.grid.info.origin.position.x = self.grid.info.origin.position.y = -3.0
         self.grid.info.origin.orientation.w = 1.0
-        self.grid.data = [100 if x in (0, 59) or y in (0, 59) else 0
-                          for y in range(60) for x in range(60)]
+        self.grid.data = [100 if x in (0, 119) or y in (0, 119) else 0
+                          for y in range(120) for x in range(120)]
         self.map_pub = self.create_publisher(OccupancyGrid, '/map',
             QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)) if publish_map else None
         self.odom_pub = self.create_publisher(Odometry, '/odom', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/ldlidar_node/scan', 10)
         self.velocities = []
+        self.raw_paths = []
+        self.create_subscription(NavPath, '/unsmoothed_plan', self.raw_paths.append, 10)
         self.create_subscription(Twist, '/cmd_vel_nav', lambda m: self.velocities.append(m.linear.x), 10)
         self.create_timer(.1, self.tick)
 
@@ -91,6 +95,17 @@ def spin_until(executor, condition, timeout, description):
     raise AssertionError('Timeout: ' + description)
 
 
+def total_turn(path):
+    headings = []
+    for a, b in zip(path.poses, path.poses[1:]):
+        dx = b.pose.position.x - a.pose.position.x
+        dy = b.pose.position.y - a.pose.position.y
+        if math.hypot(dx, dy) > 1e-6:
+            headings.append(math.atan2(dy, dx))
+    return sum(abs(math.atan2(math.sin(b - a), math.cos(b - a)))
+               for a, b in zip(headings, headings[1:]))
+
+
 def check(mode, directory):
     rclpy.init(args=[])
     bridge = NavigationBridge()
@@ -104,10 +119,10 @@ def check(mode, directory):
         command.append('start_slam:=false')
     else:
         image = directory / 'room.pgm'
-        image.write_bytes(b'P5\n60 60\n255\n' + bytes(
-            0 if x in (0, 59) or y in (0, 59) else 254 for y in range(60) for x in range(60)))
+        image.write_bytes(b'P5\n120 120\n255\n' + bytes(
+            0 if x in (0, 119) or y in (0, 119) else 254 for y in range(120) for x in range(120)))
         map_file = directory / 'room.yaml'
-        map_file.write_text('image: room.pgm\nresolution: 0.1\norigin: [-3.0, -3.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n')
+        map_file.write_text('image: room.pgm\nresolution: 0.05\norigin: [-3.0, -3.0, 0.0]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n')
         command.append('map:=' + str(map_file))
     log_path = Path('/tmp/ugv01-smoke-' + mode + '.log')
     log = log_path.open('w')
@@ -125,6 +140,7 @@ def check(mode, directory):
         goal = ComputePathToPose.Goal()
         goal.goal.header.frame_id = 'map'
         goal.goal.pose.position.x = 1.0
+        goal.goal.pose.position.y = 0.35
         goal.goal.pose.orientation.w = 1.0
         goal.planner_id = 'GridBased'
         sent = planner.send_goal_async(goal)
@@ -134,6 +150,11 @@ def check(mode, directory):
         spin_until(executor, planned.done, 8, 'path computed')
         assert len(planned.result().result.path.poses) > 2
         print(mode, 'PATH_OK', len(planned.result().result.path.poses), flush=True)
+        spin_until(executor, lambda: bool(sensors.raw_paths), 3, 'unsmoothed plan diagnostic')
+        raw_turn = total_turn(sensors.raw_paths[-1])
+        smooth_turn = total_turn(planned.result().result.path)
+        assert smooth_turn < raw_turn, (raw_turn, smooth_turn)
+        print(mode, 'SMOOTHING_OK', {'raw_turn': raw_turn, 'smooth_turn': smooth_turn}, flush=True)
         response = Future()
         bridge.do_goal(1., 0., 0., reply=response)
         spin_until(executor, response.done, 8, 'navigation goal accepted')

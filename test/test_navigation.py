@@ -9,6 +9,7 @@ import pytest
 import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import OccupancyGrid
+from nav_msgs.msg import Odometry
 from std_msgs.msg import Empty, String
 
 from ugv01_room_explore.cmd_vel_mode_manager import CmdVelModeManager
@@ -167,6 +168,40 @@ def test_no_saved_map_localization_without_confidence(bridge):
     assert bridge.readiness(None)
     bridge.amcl_cov = [100, 100, 100]
     assert bridge.readiness({'x': 0, 'y': 0, 'yaw': 0})
+
+
+def test_receiving_old_odom_does_not_refresh_sensor_age(bridge):
+    import time
+    msg = Odometry()
+    msg.header.stamp = bridge.get_clock().now().to_msg()
+    msg.header.stamp.sec -= 2
+    bridge.on_odom(msg)
+    assert time.monotonic() - bridge.odom_time >= 1.9
+
+
+def test_odom_tf_timer_holds_only_fresh_telemetry(monkeypatch):
+    from ugv01_room_explore.ugv_odom import Odom
+    monkeypatch.setattr('ugv01_room_explore.ugv_odom.serial.Serial', Mock())
+    clock = [10.0]
+    monkeypatch.setattr('ugv01_room_explore.ugv_odom.time', SimpleNamespace(monotonic=lambda: clock[0]))
+    node = Odom()
+    try:
+        sent = [call.args[0] for call in node.ser.write.call_args_list]
+        assert b'{"T":142,"cmd":50}\n' in sent
+        node.publish = Mock()
+        node.publish_timer()
+        node.publish.assert_not_called()
+        node.process({'odl': 0, 'odr': 0})
+        node.publish_timer()
+        assert node.publish.call_count == 1
+        clock[0] += 0.02
+        node.publish_timer()
+        assert node.publish.call_count == 2
+        clock[0] += 0.3
+        node.publish_timer()
+        assert node.publish.call_count == 2
+    finally:
+        node.destroy_node()
 
 
 @pytest.mark.parametrize('name', ['../map', 'a/b', '', 'map;touch /tmp/x', '/tmp/map', None])

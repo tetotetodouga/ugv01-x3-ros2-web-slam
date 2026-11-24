@@ -101,10 +101,17 @@ class NavigationBridge(Node):
         self.actual_mode = msg.data
 
     def on_scan(self, _msg):
-        self.scan_time = time.monotonic()
+        self.scan_time = self.sensor_time(_msg)
 
     def on_odom(self, _msg):
-        self.odom_time = time.monotonic()
+        self.odom_time = self.sensor_time(_msg)
+
+    def sensor_time(self, msg):
+        age = (self.get_clock().now() - Time.from_msg(msg.header.stamp)).nanoseconds / 1e9
+        # Receipt of a delayed/replayed message must not make old data fresh.
+        if age < -0.25:
+            return 0.0
+        return time.monotonic() - max(0.0, age)
 
     def on_amcl(self, msg):
         self.amcl_cov = [float(msg.pose.covariance[i]) for i in (0, 7, 35)]
@@ -288,7 +295,7 @@ class NavigationBridge(Node):
         try:
             transform = self.tf_buffer.lookup_transform('map', 'base_footprint', Time())
             age = (self.get_clock().now() - Time.from_msg(transform.header.stamp)).nanoseconds / 1e9
-            if age > 2.0:
+            if age > 0.3 or age < -0.5:
                 return None
             t, q = transform.transform.translation, transform.transform.rotation
             msg = PoseStamped()
@@ -306,9 +313,9 @@ class NavigationBridge(Node):
             return 'Выберите Nav2 + SLAM или Nav2 + карта'
         if self.map_msg is None:
             return 'Ожидание /map'
-        if now - self.scan_time > 2.0:
+        if now - self.scan_time > 1.0:
             return 'Нет свежих данных лидара'
-        if now - self.odom_time > 1.0:
+        if now - self.odom_time > 0.5:
             return 'Нет свежей одометрии'
         if pose is None:
             return 'Ожидание TF map → base_footprint'

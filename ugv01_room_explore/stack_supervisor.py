@@ -21,18 +21,18 @@ def stop_process(process):
         try:
             os.killpg(process.pid, sig)
         except ProcessLookupError:
+            process.poll()
             return
-        try:
-            process.wait(timeout=wait)
-            # A dead launch parent can leave children in the same process group.
-            if sig != signal.SIGKILL:
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-            return
-        except subprocess.TimeoutExpired:
-            continue
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            process.poll()  # reap the launch parent, then also wait for its children
+            try:
+                os.killpg(process.pid, 0)
+            except ProcessLookupError:
+                return
+            time.sleep(0.05)
+        # Escalate even if the launch parent already exited: a detached software
+        # stack must not leave a second SLAM TF publisher running in this group.
 
 
 class StackSupervisor:

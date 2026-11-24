@@ -4,12 +4,14 @@
 import json
 import math
 import serial
+import time
 
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist, TransformStamped
 from tf2_ros import TransformBroadcaster
+from ugv01_room_explore.wheel_odometry import WheelOdometry
 
 
 class Odom(Node):
@@ -38,15 +40,14 @@ class Odom(Node):
 
         # odl/odr -> meters
         self.odom_scale = 0.01
+        self.estimator = WheelOdometry(self.track_center, self.odom_scale, yaw_sign=self.yaw_sign)
+        self.last_feedback_time = None
+        self.feedback_timeout = 0.25
 
         # state
         self.x = 0.0
         self.y = 0.0
         self.th = 0.0
-
-        self.last_t = None
-        self.last_odl = None
-        self.last_odr = None
 
         self.last_vl = 0.0
         self.last_vr = 0.0
@@ -62,7 +63,7 @@ class Odom(Node):
         self.zero_sent = False
 
         # ===== SERIAL =====
-        self.ser = serial.Serial(self.port, self.baud, timeout=0.001)
+        self.ser = serial.Serial(self.port, self.baud, timeout=0.001, exclusive=True)
 
         # ===== ROS =====
         self.odom_pub = self.create_publisher(Odometry, '/odom', 20)
@@ -74,7 +75,9 @@ class Odom(Node):
         self.send({"T": 143, "cmd": 0})
         self.send({"T": 900, "main": 3, "module": 0})
         self.send({"T": 131, "cmd": 1})
-        self.send({"T": 142, "cmd": 10})
+        # 20 Hz feedback leaves UART bandwidth for commands and IMU fields.
+        # TF publication is independent of the packet rate.
+        self.send({"T": 142, "cmd": 50})
 
         self.get_logger().info(
             "=== UGV01 WHEEL ODOM STARTED === "
@@ -86,6 +89,7 @@ class Odom(Node):
 
         self.create_timer(0.002, self.read_serial)
         self.create_timer(0.05, self.cmd_timer)
+        self.create_timer(0.02, self.publish_timer)
         self.create_timer(3.0, self.status)
 
     def send(self, d):
@@ -97,11 +101,11 @@ class Odom(Node):
     def cmd_cb(self, msg):
         self.cmd_vx = float(msg.linear.x)
         self.cmd_wz = float(msg.angular.z)
-        self.last_cmd_time = self.get_clock().now()
+        self.last_cmd_time = time.monotonic()
         self.zero_sent = False
 
     def cmd_timer(self):
-        now = self.get_clock().now()
+        now = time.monotonic()
 
         if self.last_cmd_time is None:
             if not self.zero_sent:
@@ -109,7 +113,7 @@ class Odom(Node):
                 self.zero_sent = True
             return
 
-        age = (now - self.last_cmd_time).nanoseconds / 1e9
+        age = now - self.last_cmd_time
 
         if age < 0.3:
             # forward/backward
@@ -168,60 +172,21 @@ class Odom(Node):
         odl *= self.lsign
         odr *= self.rsign
 
-        now = self.get_clock().now()
-
-        if self.last_t is None:
-            self.last_t = now
-            self.last_odl = odl
-            self.last_odr = odr
+        now = time.monotonic()
+        if not self.estimator.update(odl, odr, now):
             return
+        self.last_feedback_time = now
+        self.x, self.y, self.th = self.estimator.x, self.estimator.y, self.estimator.yaw
+        self.last_ds = self.estimator.ds
+        self.last_dth_deg = math.degrees(self.estimator.dtheta)
+        self.last_vl, self.last_vr = self.estimator.vl, self.estimator.vr
 
-        dt = (now - self.last_t).nanoseconds / 1e9
-        if dt <= 0.0 or dt > 0.2:
-            self.last_t = now
-            self.last_odl = odl
-            self.last_odr = odr
+    def publish_timer(self):
+        # Hold the most recent measured pose at 50 Hz while telemetry is fresh.
+        # Do not restamp a lost encoder stream indefinitely.
+        if self.last_feedback_time is None or time.monotonic() - self.last_feedback_time > self.feedback_timeout:
             return
-
-        d_left = (odl - self.last_odl) * self.odom_scale
-        d_right = (odr - self.last_odr) * self.odom_scale
-
-        self.last_t = now
-        self.last_odl = odl
-        self.last_odr = odr
-
-        # debris protection
-        if abs(d_left) > 0.20 or abs(d_right) > 0.20:
-            return
-
-        # dead zone
-        if abs(d_left) < 0.0005:
-            d_left = 0.0
-        if abs(d_right) < 0.0005:
-            d_right = 0.0
-
-        # LINEAR motion
-        ds = (d_left + d_right) / 2.0
-
-        # TURN
-        dth = self.yaw_sign * ((d_right - d_left) / self.track_center)
-
-        old_th = self.th
-        self.th += dth
-
-        avg_th = 0.5 * (old_th + self.th)
-        self.x += ds * math.cos(avg_th)
-        self.y += ds * math.sin(avg_th)
-
-        vx = ds / dt
-        wz = dth / dt
-
-        self.last_ds = ds
-        self.last_dth_deg = math.degrees(dth)
-        self.last_vl = d_left / dt
-        self.last_vr = d_right / dt
-
-        self.publish(now, vx, wz)
+        self.publish(self.get_clock().now(), self.estimator.vx, self.estimator.wz)
 
     def publish(self, stamp, vx, wz):
         qz = math.sin(self.th / 2.0)
@@ -280,13 +245,17 @@ class Odom(Node):
         self.tf.sendTransform(t)
 
     def status(self):
+        feedback_age = (time.monotonic() - self.last_feedback_time
+                        if self.last_feedback_time is not None else float('inf'))
         self.get_logger().info(
             f"ODOM x={self.x:.3f} y={self.y:.3f} "
             f"yaw_total={math.degrees(self.th):.1f}° "
             f"dth={self.last_dth_deg:.2f}° "
             f"ds={self.last_ds:.4f} "
             f"vL={self.last_vl:.3f} vR={self.last_vr:.3f} "
-            f"track_center={self.track_center:.5f}"
+            f"track_center={self.track_center:.5f} "
+            f"cmd_x={self.cmd_vx:.3f} cmd_z={self.cmd_wz:.3f} "
+            f"feedback_age={feedback_age:.3f}s"
         )
 
     def destroy_node(self):
