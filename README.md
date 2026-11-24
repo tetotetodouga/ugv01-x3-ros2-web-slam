@@ -1,5 +1,21 @@
 # ugv01-x3 ros 2 web slam
 
+## Nav2 + web update
+
+The dashboard now supports Nav2 while mapping with SLAM Toolbox, and navigation on saved maps with AMCL. JOY, AUTO, STOP and the original mapping launch files remain available. The web UI includes map saving/selection, pose and heading selection, global localization, navigation goals, cancellation, path display and a TF-correct robot marker on desktop and mobile.
+
+```bash
+source /opt/ros/jazzy/setup.bash
+cd ~/ros2_ws
+colcon build --symlink-install --packages-select ugv01_room_explore
+source install/setup.bash
+ros2 launch ugv01_room_explore web_navigation.launch.py
+```
+
+Open `http://<robot-ip>:8080`. This launch includes the HTTP server; run it as the only robot stack. It starts in JOY with SLAM and does not send navigation goals automatically. Install dependencies with `sudo apt install ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-slam-toolbox ros-jazzy-rosbridge-server python3-serial`. Saved maps live in `~/.ros/ugv01/maps`.
+
+See [Russian setup, operation and hardware test guide](docs/NAV2_RU.md). The software checks cover lifecycle, planning and action cancellation in an isolated ROS domain. Physical navigation and localization still require hardware testing and calibration. The original project description below documents the earlier mapping setup.
+
 working progress demo of a **waveshare ugv01-x3** mobile robot running **ros 2 jazzy**, **2d lidar slam**, and a custom **web dashboard** for manual and autonomous control.
 
 this project is not a final product yet. it is a snapshot of the current working result: mapping, web control, auto/joy switching, and basic safety logic are already working. the project will be improved further, with **nav2 integration planned for the future**.

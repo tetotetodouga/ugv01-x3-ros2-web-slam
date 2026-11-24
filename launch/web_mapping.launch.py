@@ -24,6 +24,7 @@ def generate_launch_description():
     use_rviz = LaunchConfiguration('use_rviz')
     serial_port = LaunchConfiguration('serial_port')
     lidar_model = LaunchConfiguration('lidar_model')
+    start_slam = LaunchConfiguration('start_slam')
 
     odom_node = Node(
         package='ugv01_room_explore',
@@ -144,6 +145,7 @@ def generate_launch_description():
             LogInfo(msg='[UGV01] Starting SLAM Toolbox after LiDAR lifecycle warmup...'),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(str(slam_launch)),
+                condition=IfCondition(start_slam),
                 launch_arguments={
                     'slam_params_file': str(slam_yaml),
                     'use_sim_time': 'false',
@@ -170,6 +172,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_rviz', default_value='false'),
         DeclareLaunchArgument('serial_port', default_value='/dev/ttyUSB0'),
         DeclareLaunchArgument('lidar_model', default_value='LD19'),
+        DeclareLaunchArgument('start_slam', default_value='true'),
 
         odom_node,
         lidar_launch_desc,
