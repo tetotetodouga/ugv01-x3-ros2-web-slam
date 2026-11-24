@@ -1,55 +1,42 @@
+# Python environments and caches
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
 
+# ROS build output, recordings and private maps
 build/
 install/
 log/
+logs/
+maps/
+*.pgm
+*.db3
+*.mcap
 
+# Editor settings
 .vscode/
 .idea/
 
-*.pgm
-*.yaml.bak
-*.rviz.bak
+# Local configuration and credentials; retain the empty public template
+.env
+.env.*
+*.env
+!.env.example
+.ssh/
+id_rsa
+id_ecdsa
+id_ed25519
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
 
-maps/
-
-# local backups
+# Local backups and logs
 *.bak
 *.bak*
 *.tmp
-__pycache__/
-.env
-
-# local secrets / runtime config
-.env
-web/.env
-
-# local backups
-*.bak
-*.bak*
-*.tmp
-
-# python cache
-__pycache__/
-*.pyc
-
-# logs
-*.log
-
-# local secrets / runtime config
-.env
-web/.env
-
-# local backups
-*.bak
-*.bak*
-*.tmp
-
-# python cache
-__pycache__/
-*.pyc
-
-# logs
 *.log
