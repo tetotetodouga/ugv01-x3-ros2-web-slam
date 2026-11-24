@@ -11,6 +11,7 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from rclpy.time import Time
+from rclpy.signals import SignalHandlerOptions
 from action_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from lifecycle_msgs.srv import GetState
@@ -422,7 +423,10 @@ class NavigationBridge(Node):
 
 class RosRuntime:
     def __init__(self):
-        rclpy.init(args=[])
+        # HTTP main owns SIGINT/SIGTERM. rclpy's default signal handler would
+        # destroy the ROS context before the supervisor could cancel and reap
+        # its separate SLAM/Nav2 process groups.
+        rclpy.init(args=[], signal_handler_options=SignalHandlerOptions.NO)
         self.node = NavigationBridge()
         self.executor = SingleThreadedExecutor()
         self.executor.add_node(self.node)
@@ -430,7 +434,8 @@ class RosRuntime:
         self.thread.start()
 
     def close(self):
-        self.node.invoke('cancel')
+        if rclpy.ok() and self.thread.is_alive():
+            self.node.invoke('cancel')
         self.executor.shutdown(timeout_sec=3.0)
         self.thread.join(timeout=3.0)
         self.node.destroy_node()

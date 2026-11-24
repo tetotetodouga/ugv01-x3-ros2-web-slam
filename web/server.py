@@ -156,7 +156,10 @@ def main():
         os.getenv('UGV_MAPS_DIR', str(Path.home() / '.ros/ugv01/maps')),
         os.getenv('UGV_LOGS_DIR', str(Path.home() / '.ros/ugv01/logs')), AUTO_CMD)
     def stopping(_signal, _frame):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         raise KeyboardInterrupt
+    signal.signal(signal.SIGINT, stopping)
     signal.signal(signal.SIGTERM, stopping)
     try:
         if SUPERVISOR.managed:
@@ -167,6 +170,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         SUPERVISOR.close()
         if server:
             server.server_close()

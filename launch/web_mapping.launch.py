@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 
 from ament_index_python.packages import get_package_share_directory
 
@@ -98,41 +99,8 @@ def generate_launch_description():
             LogInfo(msg='[UGV01] Waiting for LD19 lifecycle node, then configure/activate...'),
             ExecuteProcess(
                 cmd=[
-                    'bash', '-lc',
-                    '''
-                    source /opt/ros/jazzy/setup.bash
-                    source ~/ros2_ws/install/setup.bash
-
-                    echo "[UGV01] waiting for /ldlidar_node discovery..."
-                    STATE=""
-
-                    for i in $(seq 1 80); do
-                      STATE=$(ros2 lifecycle get /ldlidar_node 2>/dev/null || true)
-                      if [ -n "$STATE" ]; then
-                        echo "[UGV01] ldlidar state: $STATE"
-                        break
-                      fi
-                      sleep 1
-                    done
-
-                    if echo "$STATE" | grep -q "unconfigured"; then
-                      echo "[UGV01] configuring /ldlidar_node..."
-                      ros2 lifecycle set /ldlidar_node configure || true
-                      sleep 6
-                    fi
-
-                    STATE=$(ros2 lifecycle get /ldlidar_node 2>/dev/null || true)
-                    echo "[UGV01] ldlidar state after configure: $STATE"
-
-                    if echo "$STATE" | grep -q "inactive"; then
-                      echo "[UGV01] activating /ldlidar_node..."
-                      ros2 lifecycle set /ldlidar_node activate || true
-                      sleep 6
-                    fi
-
-                    echo "[UGV01] final ldlidar state:"
-                    ros2 lifecycle get /ldlidar_node || true
-                    '''
+                    sys.executable, '-m', 'ugv01_room_explore.lidar_lifecycle',
+                    '/ldlidar_node',
                 ],
                 output='screen'
             )

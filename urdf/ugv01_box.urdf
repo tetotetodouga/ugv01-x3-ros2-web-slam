@@ -154,7 +154,7 @@
   <joint name="base_to_left_track_upper" type="fixed">
     <parent link="base_link"/>
     <child link="left_track_upper"/>
-    <origin xyz="0.000 0.098 0.064" rpy="0 0 0"/>
+    <origin xyz="0.000 0.07616 0.064" rpy="0 0 0"/>
   </joint>
 
   <link name="right_track_upper">
@@ -169,7 +169,7 @@
   <joint name="base_to_right_track_upper" type="fixed">
     <parent link="base_link"/>
     <child link="right_track_upper"/>
-    <origin xyz="0.000 -0.098 0.064" rpy="0 0 0"/>
+    <origin xyz="0.000 -0.07616 0.064" rpy="0 0 0"/>
   </joint>
 
   <link name="left_track_lower">
@@ -184,7 +184,7 @@
   <joint name="base_to_left_track_lower" type="fixed">
     <parent link="base_link"/>
     <child link="left_track_lower"/>
-    <origin xyz="0.000 0.098 0.015" rpy="0 0 0"/>
+    <origin xyz="0.000 0.07616 0.015" rpy="0 0 0"/>
   </joint>
 
   <link name="right_track_lower">
@@ -199,7 +199,7 @@
   <joint name="base_to_right_track_lower" type="fixed">
     <parent link="base_link"/>
     <child link="right_track_lower"/>
-    <origin xyz="0.000 -0.098 0.015" rpy="0 0 0"/>
+    <origin xyz="0.000 -0.07616 0.015" rpy="0 0 0"/>
   </joint>
 
   <!-- front and rear sprockets -->
@@ -215,7 +215,7 @@
   <joint name="left_front_sprocket_joint" type="fixed">
     <parent link="base_link"/>
     <child link="left_front_sprocket"/>
-    <origin xyz="0.095 0.098 0.034" rpy="0 0 0"/>
+    <origin xyz="0.095 0.07616 0.034" rpy="0 0 0"/>
   </joint>
 
   <link name="right_front_sprocket">
@@ -230,7 +230,7 @@
   <joint name="right_front_sprocket_joint" type="fixed">
     <parent link="base_link"/>
     <child link="right_front_sprocket"/>
-    <origin xyz="0.095 -0.098 0.034" rpy="0 0 0"/>
+    <origin xyz="0.095 -0.07616 0.034" rpy="0 0 0"/>
   </joint>
 
   <link name="left_rear_sprocket">
@@ -245,7 +245,7 @@
   <joint name="left_rear_sprocket_joint" type="fixed">
     <parent link="base_link"/>
     <child link="left_rear_sprocket"/>
-    <origin xyz="-0.095 0.098 0.034" rpy="0 0 0"/>
+    <origin xyz="-0.095 0.07616 0.034" rpy="0 0 0"/>
   </joint>
 
   <link name="right_rear_sprocket">
@@ -260,7 +260,7 @@
   <joint name="right_rear_sprocket_joint" type="fixed">
     <parent link="base_link"/>
     <child link="right_rear_sprocket"/>
-    <origin xyz="-0.095 -0.098 0.034" rpy="0 0 0"/>
+    <origin xyz="-0.095 -0.07616 0.034" rpy="0 0 0"/>
   </joint>
 
   <!-- road wheels -->
@@ -289,7 +289,7 @@
   <joint name="left_road_wheels_joint" type="fixed">
     <parent link="base_link"/>
     <child link="left_road_wheels"/>
-    <origin xyz="0.000 0.098 0.030" rpy="0 0 0"/>
+    <origin xyz="0.000 0.07616 0.030" rpy="0 0 0"/>
   </joint>
 
   <link name="right_road_wheels">
@@ -317,7 +317,7 @@
   <joint name="right_road_wheels_joint" type="fixed">
     <parent link="base_link"/>
     <child link="right_road_wheels"/>
-    <origin xyz="0.000 -0.098 0.030" rpy="0 0 0"/>
+    <origin xyz="0.000 -0.07616 0.030" rpy="0 0 0"/>
   </joint>
 
   <!-- tread blocks as grouped visuals -->
@@ -335,7 +335,7 @@
   <joint name="left_tread_blocks_joint" type="fixed">
     <parent link="base_link"/>
     <child link="left_tread_blocks"/>
-    <origin xyz="0.000 0.098 0.006" rpy="0 0 0"/>
+    <origin xyz="0.000 0.07616 0.006" rpy="0 0 0"/>
   </joint>
 
   <link name="right_tread_blocks">
@@ -352,7 +352,7 @@
   <joint name="right_tread_blocks_joint" type="fixed">
     <parent link="base_link"/>
     <child link="right_tread_blocks"/>
-    <origin xyz="0.000 -0.098 0.006" rpy="0 0 0"/>
+    <origin xyz="0.000 -0.07616 0.006" rpy="0 0 0"/>
   </joint>
 
   <!-- ================= TOP PLATFORM ================= -->

@@ -23,6 +23,8 @@ const $ = (id) => document.getElementById(id);
     let odom = { x: 0, y: 0, yaw: 0 };
     let robotPose = null;
     let robotPoseAt = 0;
+    let driveCmdAt = 0;
+    let costmapMsg = null;
     let navigation = {};
     let plannedPath = [];
     let mapTool = 'pan';
@@ -89,6 +91,9 @@ const $ = (id) => document.getElementById(id);
           send({ op: "subscribe", topic: "/odom", type: "nav_msgs/msg/Odometry", throttle_rate: 120 });
           send({ op: "subscribe", topic: "/ugv01/robot_pose", type: "geometry_msgs/msg/PoseStamped", throttle_rate: 120 });
           send({ op: "subscribe", topic: "/plan", type: "nav_msgs/msg/Path", throttle_rate: 500 });
+          send({ op: "subscribe", topic: "/cmd_vel", type: "geometry_msgs/msg/Twist", throttle_rate: 100 });
+          send({ op: "subscribe", topic: "/global_costmap/costmap", type: "nav_msgs/msg/OccupancyGrid", throttle_rate: 1000,
+            qos: { durability: "transient_local", reliability: "reliable", depth: 1 } });
         };
 
         ws.onclose = () => {
@@ -107,6 +112,15 @@ const $ = (id) => document.getElementById(id);
           let data;
           try { data = JSON.parse(event.data); } catch (_) { return; }
           if (data.op !== "publish") return;
+
+          if (data.topic === '/cmd_vel') {
+            driveCmdAt = Date.now();
+            $("cmdStat").textContent = `${data.msg.linear.x.toFixed(2)} / ${data.msg.angular.z.toFixed(2)}`;
+          }
+          if (data.topic === '/global_costmap/costmap') {
+            costmapMsg = data.msg.header.frame_id === 'map' ? data.msg : null;
+            drawMap();
+          }
 
           if (data.topic === '/ugv01/robot_pose') {
             const p = data.msg.pose;
@@ -153,7 +167,6 @@ const $ = (id) => document.getElementById(id);
           angular: { x: 0, y: 0, z: angular }
         }
       });
-      $("cmdStat").textContent = `${linear.toFixed(2)} / ${angular.toFixed(2)}`;
     }
 
     function stopRobot() {
@@ -278,6 +291,7 @@ const $ = (id) => document.getElementById(id);
 
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(getMapRaster(mapMsg), ox, oy, mw * scale, mh * scale);
+      drawCostmap();
 
       const hasKnown = Array.prototype.some.call(data, v => v !== -1 && v !== 255);
       if (!hasKnown) {

@@ -1,9 +1,11 @@
 """Own only software processes; never start motor drivers from an HTTP request."""
+from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
 
@@ -19,7 +21,13 @@ def stop_process(process):
         return
     for sig, wait in ((signal.SIGINT, 7), (signal.SIGTERM, 3), (signal.SIGKILL, 2)):
         try:
-            os.killpg(process.pid, sig)
+            if sig == signal.SIGINT and process.poll() is None:
+                # ros2 launch forwards SIGINT to its children itself. Sending
+                # it to the whole group first interrupts ROS teardown twice,
+                # including nodes still installing their signal handlers.
+                os.kill(process.pid, sig)
+            else:
+                os.killpg(process.pid, sig)
         except ProcessLookupError:
             process.poll()
             return
@@ -49,11 +57,17 @@ class StackSupervisor:
         self.selected_map = None
         self.error = ''
         self.closed = threading.Event()
+        # Linux parent-death signals follow the thread that creates a child.
+        # HTTP request threads are short-lived, so launch from one persistent
+        # worker and keep it alive until all software children have stopped.
+        self.launcher = ThreadPoolExecutor(max_workers=1, thread_name_prefix='ugv01-launch')
 
     def spawn(self, command, log_name):
         with (self.logs_dir / log_name).open('a', buffering=1) as log:
-            return subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT,
-                                    start_new_session=True)
+            command = [sys.executable, '-m', 'ugv01_room_explore.managed_process',
+                       str(os.getpid()), *command]
+            return self.launcher.submit(subprocess.Popen, command, stdout=log,
+                stderr=subprocess.STDOUT, start_new_session=True).result()
 
     def maps(self):
         return sorted(p.stem for p in self.maps_dir.glob('*.yaml') if p.is_file())
@@ -171,9 +185,15 @@ class StackSupervisor:
 
     def close(self):
         self.closed.set()
-        self.stop()
+        try:
+            self.bridge.invoke('cancel')
+        except Exception:
+            # Reap software children even if the ROS executor/context has died.
+            pass
         with self.lock:
+            self.stop_auto()
             stop_process(self.process)
             stop_process(self.slam_process)
             self.process = None
             self.slam_process = None
+        self.launcher.shutdown(wait=True)

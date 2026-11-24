@@ -3,6 +3,8 @@ let rasterSource = null;
 let rasterCanvas = null;
 let lastStackMode = null;
 let requestBusy = false;
+let costmapRasterSource = null;
+let costmapRaster = null;
 
 function apiHeaders() {
   return { 'Content-Type': 'application/json', 'X-Dashboard-Token': $('dashboardToken').value };
@@ -48,11 +50,13 @@ async function refreshServerStatus() {
     if (mode !== data.mode) stopRobot();
     mode = data.mode || 'JOY';
     renderDriveMode();
+    if (Date.now() - driveCmdAt > 1500) $('cmdStat').textContent = '— / —';
     const sourceChanged = lastStackMode !== navigation.stack_mode;
     if (sourceChanged) {
       if (lastStackMode !== null) {
         selection = null;
         plannedPath = [];
+        costmapMsg = null;
         robotPose = null;
         if (!(lastStackMode === 'mapping' && navigation.stack_mode === 'nav_slam') &&
             !(lastStackMode === 'nav_slam' && navigation.stack_mode === 'mapping')) mapMsg = null;
@@ -155,6 +159,7 @@ function initNavigation() {
     } finally { $('saveMap').disabled = false; }
   });
   $('reloadMaps').addEventListener('click', reloadMaps);
+  $('showCostmap').addEventListener('change', drawMap);
   $('toolPan').addEventListener('click', () => setMapTool('pan'));
   $('toolGoal').addEventListener('click', () => setMapTool('goal'));
   $('toolPose').addEventListener('click', () => setMapTool('pose'));
@@ -281,6 +286,38 @@ function getMapRaster(msg) {
   context.putImageData(pixels, 0, 0);
   rasterSource = msg;
   return rasterCanvas;
+}
+
+function drawCostmap() {
+  if (!costmapMsg || !$('showCostmap').checked || !navigation.stack_mode?.startsWith('nav_')) return;
+  const msg = costmapMsg, info = msg.info;
+  if (costmapRasterSource !== msg) {
+    costmapRaster = document.createElement('canvas');
+    costmapRaster.width = info.width; costmapRaster.height = info.height;
+    const context = costmapRaster.getContext('2d');
+    const pixels = context.createImageData(info.width, info.height);
+    for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) {
+      const value = msg.data[y * info.width + x];
+      if (value <= 0 || value === 255) continue;
+      const color = value >= 100 ? [255, 77, 109, 180] :
+        value >= 99 ? [245, 158, 11, 145] : [252, 211, 77, Math.round(value * .8)];
+      pixels.data.set(color, ((info.height - y - 1) * info.width + x) * 4);
+    }
+    context.putImageData(pixels, 0, 0);
+    costmapRasterSource = msg;
+  }
+  const a = quatYaw(info.origin.orientation), c = Math.cos(a), s = Math.sin(a);
+  const width = info.width * info.resolution, height = info.height * info.resolution;
+  const origin = info.origin.position;
+  const tl = worldToCanvas(origin.x - s * height, origin.y + c * height);
+  const tr = worldToCanvas(origin.x + c * width - s * height, origin.y + s * width + c * height);
+  const bl = worldToCanvas(origin.x, origin.y);
+  ctx.save();
+  ctx.setTransform((tr.x - tl.x) / info.width, (tr.y - tl.y) / info.width,
+    (bl.x - tl.x) / info.height, (bl.y - tl.y) / info.height, tl.x, tl.y);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(costmapRaster, 0, 0);
+  ctx.restore();
 }
 
 function drawNavigation(info) {

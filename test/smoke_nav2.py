@@ -51,12 +51,34 @@ class Sensors(Node):
         self.odom_pub = self.create_publisher(Odometry, '/odom', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/ldlidar_node/scan', 10)
         self.velocities = []
+        self.angular_velocities = []
+        self.simulate = False
+        self.sim_x = self.sim_y = self.sim_yaw = 0.0
+        self.simulation_tick = time.monotonic()
+        self.command = Twist()
         self.raw_paths = []
         self.create_subscription(NavPath, '/unsmoothed_plan', self.raw_paths.append, 10)
-        self.create_subscription(Twist, '/cmd_vel_nav', lambda m: self.velocities.append(m.linear.x), 10)
+        self.create_subscription(Twist, '/cmd_vel_nav', self.on_velocity, 10)
         self.create_timer(.1, self.tick)
 
+    def on_velocity(self, msg):
+        self.command = msg
+        self.velocities.append(msg.linear.x)
+        self.angular_velocities.append(msg.angular.z)
+
     def tick(self):
+        now = time.monotonic()
+        dt = min(.2, now - self.simulation_tick)
+        self.simulation_tick = now
+        if self.simulate:
+            yaw_mid = self.sim_yaw + self.command.angular.z * dt / 2
+            self.sim_x += self.command.linear.x * math.cos(yaw_mid) * dt
+            self.sim_y += self.command.linear.x * math.sin(yaw_mid) * dt
+            self.sim_yaw += self.command.angular.z * dt
+        # Deliberately leave measured twist at zero, as between encoder ticks.
+        # Quantized pose still updates while the ideal software body responds.
+        px, py = round(self.sim_x, 2), round(self.sim_y, 2)
+        yaw = round(self.sim_yaw / .051) * .051
         stamp = self.get_clock().now().to_msg()
         transforms = []
         edges = [('odom', 'base_footprint')]
@@ -66,20 +88,35 @@ class Sensors(Node):
             tf = TransformStamped()
             tf.header.stamp, tf.header.frame_id, tf.child_frame_id = stamp, parent, child
             tf.transform.rotation.w = 1.0
+            if child == 'base_footprint':
+                tf.transform.translation.x, tf.transform.translation.y = px, py
+                tf.transform.rotation.z = math.sin(yaw / 2)
+                tf.transform.rotation.w = math.cos(yaw / 2)
             transforms.append(tf)
         self.tf.sendTransform(transforms)
         odom = Odometry()
         odom.header.stamp, odom.header.frame_id = stamp, 'odom'
         odom.child_frame_id = 'base_footprint'
-        odom.pose.pose.orientation.w = 1.0
+        odom.pose.pose.position.x, odom.pose.pose.position.y = px, py
+        odom.pose.pose.orientation.z = math.sin(yaw / 2)
+        odom.pose.pose.orientation.w = math.cos(yaw / 2)
         self.odom_pub.publish(odom)
         scan = LaserScan()
         scan.header.stamp, scan.header.frame_id = stamp, 'base_footprint'
         scan.angle_min, scan.angle_max = -math.pi, math.pi - math.pi / 180
         scan.angle_increment = math.pi / 180
         scan.scan_time, scan.range_min, scan.range_max = .1, .12, 12.0
-        scan.ranges = [2.90 / max(abs(math.cos(-math.pi + i * math.pi / 180)),
-                                   abs(math.sin(-math.pi + i * math.pi / 180))) for i in range(360)]
+        ranges = []
+        for i in range(360):
+            angle = -math.pi + i * math.pi / 180 + self.sim_yaw
+            cx, sy = math.cos(angle), math.sin(angle)
+            distances = []
+            if abs(cx) > 1e-8:
+                distances.append(((2.90 if cx > 0 else -2.90) - self.sim_x) / cx)
+            if abs(sy) > 1e-8:
+                distances.append(((2.90 if sy > 0 else -2.90) - self.sim_y) / sy)
+            ranges.append(min(distances))
+        scan.ranges = ranges
         self.scan_pub.publish(scan)
         if self.map_pub:
             self.grid.header.stamp = stamp
@@ -165,6 +202,19 @@ def check(mode, directory):
         assert bridge.drive_mode == 'JOY'
         spin_until(executor, lambda: bridge.goal_state == 'canceled', 3, 'goal canceled')
         print(mode, 'ACTION_AND_CANCEL_OK (isolated domain; no motor driver)', flush=True)
+        sensors.velocities.clear()
+        sensors.angular_velocities.clear()
+        sensors.simulate = True
+        response = Future()
+        bridge.do_goal(0., 1., math.pi / 2, reply=response)
+        spin_until(executor, response.done, 5, 'turn then drive goal accepted')
+        assert response.result()['ok'], response.result()
+        spin_until(executor, lambda: sensors.sim_y > .03 and any(v > .02 for v in sensors.velocities),
+                   10, 'rotation must transition to forward motion with quantized odometry')
+        assert max(abs(w) for w in sensors.angular_velocities) > .2
+        print(mode, 'TURN_THEN_DRIVE_OK', {'simulated_y': sensors.sim_y,
+            'max_forward_command': max(sensors.velocities)}, flush=True)
+        bridge.do_cancel()
         planner.destroy()
     except Exception:
         print('STATUS AT FAILURE', bridge.read(), flush=True)

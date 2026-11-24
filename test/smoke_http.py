@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import signal
 import tempfile
 import time
 import urllib.error
@@ -54,6 +55,11 @@ def main():
                 assert code == 200, status
                 assert status['slam_pid'] == original_slam_pid
                 assert status['stack_pid'] is not None
+                launched_pid = status['stack_pid']
+                time.sleep(1)
+                code, status = request('/api/status')
+                assert code == 200 and status['stack_running'], status
+                assert status['stack_pid'] == launched_pid, status
                 assert request('/api/navigation/mode', {'mode': 'nav_map', 'map': '../bad'})[0] == 400
                 code, status = request('/api/navigation/mode', {'mode': 'mapping'})
                 assert code == 200, status
@@ -65,10 +71,21 @@ def main():
                 print('HTTP SMOKE PASSED: auth, validation, goal guard, SLAM preservation, mode switch, STOP', flush=True)
             except Exception:
                 print(log_path.read_text()[-12000:], flush=True)
+                for child_log in (Path(folder) / 'logs').glob('*.log'):
+                    print(child_log.name, child_log.read_text()[-8000:], flush=True)
                 raise
             finally:
-                process.terminate()
+                process.send_signal(signal.SIGINT)
                 process.wait(timeout=25)
+                # Ctrl+C must not leave the SLAM launch or its ROS children.
+                for entry in Path('/proc').iterdir():
+                    if not entry.name.isdigit():
+                        continue
+                    try:
+                        fields = (entry / 'stat').read_text().rsplit(') ', 1)[1].split()
+                        assert not (int(fields[2]) == original_slam_pid and fields[0] not in ('Z', 'X')), entry
+                    except (FileNotFoundError, ProcessLookupError):
+                        pass
 
 
 if __name__ == '__main__':
