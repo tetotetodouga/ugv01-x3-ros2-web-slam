@@ -460,4 +460,3 @@ const $ = (id) => document.getElementById(id);
     connect();
     setInterval(driveLoop, RATE_MS);
     setInterval(refreshServerStatus, 1200);
-  
